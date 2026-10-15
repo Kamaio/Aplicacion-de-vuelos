@@ -1,4 +1,5 @@
-import { Column, Entity } from "typeorm";
+import { Column, Entity, OneToOne } from "typeorm";
+import { InformacionPerfil } from "./informacionPerfil.entity";
 
 @Entity()
 export class Usuario {
@@ -18,6 +19,9 @@ export class Usuario {
     @Column()
     rol: string;
 
-    @Column()
-    activo: boolean;
+    @Column({default: true})
+    activo: boolean = true;
+
+    @OneToOne(() => InformacionPerfil, informacionPerfil => informacionPerfil.id_usuario)
+    informacionPerfil: InformacionPerfil;
 }
