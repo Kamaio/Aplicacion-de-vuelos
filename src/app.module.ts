@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { UsuarioModule } from './usuario/usuario.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
 
 
 @Module({
@@ -27,6 +28,8 @@ import { ConfigModule } from '@nestjs/config';
         rejectUnauthorized: false,
       }
     }),
+
+    AuthModule,
 
 
 

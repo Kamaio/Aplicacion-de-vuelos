@@ -63,16 +63,14 @@ export class UsuarioService {
     finally{
       await queryRunner.release();
     }
-
-
   }
 
   async findAll() {
     return await this.usuarioRepository.find();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} usuario`;
+  async findOne(id: number) {
+    return await this.usuarioRepository.findOne({where: {id_usuario: id}});
   }
 
   update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
