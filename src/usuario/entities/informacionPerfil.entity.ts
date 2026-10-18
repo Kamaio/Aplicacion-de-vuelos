@@ -9,7 +9,7 @@ export class InformacionPerfil {
 
     @OneToOne(() => Usuario, usuario => usuario.informacionPerfil, {onDelete: 'CASCADE'})
     @JoinColumn({name: 'id_usuario'})
-    id_usuario: number;
+    usuario: Usuario;
 
     @Column()
     dni: number;

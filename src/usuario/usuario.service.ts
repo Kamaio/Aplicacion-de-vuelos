@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUsuarioCompletoDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -66,18 +66,25 @@ export class UsuarioService {
   }
 
   async findAll() {
-    return await this.usuarioRepository.find();
+    return await this.usuarioRepository.find({where: {activo: true}, relations: {informacionPerfil: true}});
   }
 
   async findOne(id: number) {
-    return await this.usuarioRepository.findOne({where: {id_usuario: id}});
+    return await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}, relations: {informacionPerfil: true}});
   }
 
   update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
     return `This action updates a #${id} usuario`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} usuario`;
+  async remove(id: number) {
+    const usuario = await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}}); //seria medio marica eliminar un usuario que ya esta eliminado pero pues ahi se lo puse
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    usuario.activo = false;
+    await this.usuarioRepository.save(usuario);
+    return { message: `Usuario con id ${id} eliminado exitosamente` };
   }
 }

@@ -18,8 +18,8 @@ export class AuthService {
     async login(loginDto: LoginDto) {
         const {correo, contrasena} = loginDto;
 
-        const usuario = await this.usuarioRepository.findOne({ where: { correo } });
-        if (!usuario) { throw new UnauthorizedException('Correo no existente'); }
+        const usuario = await this.usuarioRepository.findOne({ where: { correo, activo: true } });
+        if (!usuario) { throw new UnauthorizedException('Correo no existente o usuario eliminado'); }
 
         const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena);
         if (!contrasenaValida) { throw new UnauthorizedException('Contraseña incorrecta'); }
