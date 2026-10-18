@@ -22,6 +22,6 @@ export class Usuario {
     @Column({default: true})
     activo: boolean = true;
 
-    @OneToOne(() => InformacionPerfil, informacionPerfil => informacionPerfil.usuario)
+    @OneToOne(() => InformacionPerfil, informacionPerfil => informacionPerfil.usuario, {cascade: true})
     informacionPerfil: InformacionPerfil;
 }

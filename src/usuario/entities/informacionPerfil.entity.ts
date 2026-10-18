@@ -7,7 +7,7 @@ export class InformacionPerfil {
     @Column({primary: true, generated: true})
     id_perfil: number;
 
-    @OneToOne(() => Usuario, usuario => usuario.informacionPerfil, {onDelete: 'CASCADE'})
+    @OneToOne(() => Usuario, usuario => usuario.informacionPerfil, {onDelete: 'CASCADE'}) //cascade por buena practica nomas porque tenemos eliminacion logica
     @JoinColumn({name: 'id_usuario'})
     usuario: Usuario;
 

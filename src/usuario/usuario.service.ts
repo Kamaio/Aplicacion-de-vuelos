@@ -73,8 +73,31 @@ export class UsuarioService {
     return await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}, relations: {informacionPerfil: true}});
   }
 
-  update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
-    return `This action updates a #${id} usuario`;
+  async update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
+    const usuario = await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}, relations: {informacionPerfil: true}});
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    const { usuario: nombreUsuario, contrasena, correo, rol, ...datosPerfil } = updateUsuarioDto as any;
+
+    const nuevoUsuario: Partial<Usuario> = {};
+    if (nombreUsuario != undefined) nuevoUsuario.usuario = nombreUsuario;
+    if (contrasena != undefined) nuevoUsuario.contrasena = contrasena;
+    if (correo != undefined) nuevoUsuario.correo = correo;
+    if (rol != undefined) nuevoUsuario.rol = rol;
+
+    Object.assign(usuario, nuevoUsuario);
+
+    // 4. Actualizar campos de InformacionPerfil si existen cambios enviados
+    if (usuario.informacionPerfil && Object.keys(datosPerfil).length > 0) {
+      Object.assign(usuario.informacionPerfil, datosPerfil);
+    }
+
+    // 5. Un solo save actualiza AMBAS tablas en la base de datos gracias a cascade
+    await this.usuarioRepository.save(usuario);
+
+  return { message: `Usuario con id ${id} actualizado exitosamente` };
   }
 
   async remove(id: number) {
