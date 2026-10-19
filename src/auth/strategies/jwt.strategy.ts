@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // Valida el token y expone req.user
   async validate(payload: { sub: number; correo: string; rol: string }) {
     const { sub: id_usuario } = payload;
-    const usuario = await this.usuarioRepository.findOne({ where: { id_usuario } });
+    const usuario = await this.usuarioRepository.findOne({ where: { id_usuario, activo: true }});
 
     if (!usuario) {
       throw new UnauthorizedException('Token no válido o usuario inexistente');
