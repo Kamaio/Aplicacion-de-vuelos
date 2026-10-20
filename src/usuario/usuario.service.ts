@@ -70,7 +70,24 @@ export class UsuarioService {
   }
 
   async findAll() {
-    return await this.usuarioRepository.find({where: {activo: true}, relations: {informacionPerfil: true}});
+    const usuarios = await this.usuarioRepository.find({
+      where: { activo: true }, 
+      relations: { informacionPerfil: true }
+    });
+
+    return usuarios.map(usuario => ({
+      id_usuario: usuario.id_usuario,
+      username: usuario.usuario,
+      email: usuario.correo,
+      rol: usuario.rol,
+      cc: usuario.informacionPerfil?.dni,
+      nombres: usuario.informacionPerfil?.nombres,
+      apellidos: usuario.informacionPerfil?.apellidos,
+      fechaNacimiento: usuario.informacionPerfil?.fecha_nacimiento,
+      lugarNacimiento: usuario.informacionPerfil?.lugar_nacimiento,
+      genero: usuario.informacionPerfil?.genero,
+      direccionFacturacion: usuario.informacionPerfil?.direccion_facturacion
+    }));
   }
 
   async findAdministradores() {
