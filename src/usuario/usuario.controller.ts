@@ -56,8 +56,8 @@ export class UsuarioController {
   remove(@Param('id') id: number, @Req() req: any) {
 
     const rolesPermitidos = ['ADMIN', 'ROOT'];
-    if (req.user.id_usuario != id && !rolesPermitidos.includes(req.user.rol)) {
-      throw new ForbiddenException("No se puede eliminar un id diferente al de la sesion actual o no se tiene el rol adecuado para eliminar usuarios")
+    if (!rolesPermitidos.includes(req.user.rol)) {
+      throw new ForbiddenException("No se tiene el rol adecuado para eliminar usuarios")
     }
 
     return this.usuarioService.remove(+id);
