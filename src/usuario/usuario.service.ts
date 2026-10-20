@@ -100,30 +100,54 @@ export class UsuarioService {
   }
 
   async update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
-    const usuario = await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}, relations: {informacionPerfil: true}});
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id_usuario: id, activo: true },
+      relations: { informacionPerfil: true }
+    });
+
     if (!usuario) {
-      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+      throw new NotFoundException("Usuario con id ${id} no encontrado");
     }
 
-    const { usuario: nombreUsuario, contrasena, correo, rol, ...datosPerfil } = updateUsuarioDto as any;
+    const dto = updateUsuarioDto as any;
 
-    const nuevoUsuario: Partial<Usuario> = {};
-    if (nombreUsuario != undefined) nuevoUsuario.usuario = nombreUsuario;
-    if (contrasena != undefined) nuevoUsuario.contrasena = contrasena;
-    if (correo != undefined) nuevoUsuario.correo = correo;
-    if (rol != undefined) nuevoUsuario.rol = rol;
-
-    Object.assign(usuario, nuevoUsuario);
-
-    // 4. Actualizar campos de InformacionPerfil si existen cambios enviados
-    if (usuario.informacionPerfil && Object.keys(datosPerfil).length > 0) {
-      Object.assign(usuario.informacionPerfil, datosPerfil);
+    // 1. Actualizar campos de la entidad principal 'Usuario'
+    if (dto.usuario !== undefined) usuario.usuario = dto.usuario;
+    if (dto.correo !== undefined) usuario.correo = dto.correo;
+    if (dto.rol !== undefined) usuario.rol = dto.rol;
+    
+    if (dto.contrasena !== undefined && dto.contrasena.trim() !== '') {
+      const saltRounds = 10;
+      usuario.contrasena = await bcrypt.hash(dto.contrasena, saltRounds);
     }
 
-    // 5. Un solo save actualiza AMBAS tablas en la base de datos gracias a cascade
+    // 2. Extraer datos del perfil (ya sea si vienen anidados en informacionPerfil o planos)
+    const perfilData = dto.informacionPerfil || dto;
+
+    if (usuario.informacionPerfil) {
+      if (perfilData.direccion_facturacion !== undefined) {
+        usuario.informacionPerfil.direccion_facturacion = perfilData.direccion_facturacion;
+      } else if (perfilData.direccionFacturacion !== undefined) {
+        usuario.informacionPerfil.direccion_facturacion = perfilData.direccionFacturacion;
+      }
+
+      if (perfilData.foto_url !== undefined) {
+        usuario.informacionPerfil.foto_url = perfilData.foto_url;
+      } else if (perfilData.imagenUrl !== undefined) {
+        usuario.informacionPerfil.foto_url = perfilData.imagenUrl;
+      }
+
+      if (perfilData.dni !== undefined) usuario.informacionPerfil.dni = perfilData.dni;
+      if (perfilData.nombres !== undefined) usuario.informacionPerfil.nombres = perfilData.nombres;
+      if (perfilData.apellidos !== undefined) usuario.informacionPerfil.apellidos = perfilData.apellidos;
+    }
+
+    // 3. Guardar la entidad (gracias a cascade: true actualizará ambas tablas en PostgreSQL)
     await this.usuarioRepository.save(usuario);
 
-  return { message: `Usuario con id ${id} actualizado exitosamente` };
+    // 4. Retornar el usuario actualizado completo para que Angular refresque la UI inmediatamente
+    console.log("Usuario actualizado:", usuario);
+    return usuario;
   }
 
   async remove(id: number) {

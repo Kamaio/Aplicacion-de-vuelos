@@ -37,7 +37,8 @@ export class UsuarioController {
   @Get(':id')
   findOne(@Param('id') id: number, @Req() req: any) {
 
-    if (req.user.rol == 'CLIENTE') {
+    if (req.user.rol == 'CLIENTE' && req.user.id_usuario != id 
+    ) {
       throw new ForbiddenException("Se requiere ser administrador para revisar el listado de usuarios")
     }
 
@@ -45,14 +46,9 @@ export class UsuarioController {
   }
 
   @UseGuards(AuthGuard('jwt'))
-  @Patch(':id')
-  update(@Param('id') id: number, @Body() updateUsuarioDto: UpdateUsuarioDto, @Req() req: any) {
-
-    if (req.user.id_usuario != id) {
-      throw new ForbiddenException("No se puede editar un id diferente al de la sesion actual")
-    }
-
-    return this.usuarioService.update(+id, updateUsuarioDto);
+  @Patch()
+  update(@Body() updateUsuarioDto: UpdateUsuarioDto, @Req() req: any) {
+    return this.usuarioService.update(req.user.id_usuario, updateUsuarioDto);
   }
 
   @UseGuards(AuthGuard('jwt'))
