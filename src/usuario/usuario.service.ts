@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { DataSource, Repository } from 'typeorm';
 import { InformacionPerfil } from './entities/informacionPerfil.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsuarioService {
@@ -24,11 +25,14 @@ export class UsuarioService {
     await queryRunner.startTransaction();
 
     try{
+      const saltRounds = 10;
+      const contrasenaHasheada = await bcrypt.hash(createUsuarioCompletoDto.password, saltRounds);
+
       const nuevoUsuario = queryRunner.manager.create(Usuario, {
 
-        usuario: createUsuarioCompletoDto.usuario,
-        contrasena: createUsuarioCompletoDto.contrasena,
-        correo: createUsuarioCompletoDto.correo,
+        usuario: createUsuarioCompletoDto.username,
+        contrasena: contrasenaHasheada,
+        correo: createUsuarioCompletoDto.email,
         rol: createUsuarioCompletoDto.rol,
         activo: true
       })
@@ -36,15 +40,15 @@ export class UsuarioService {
 
 
       const nuevaInformacionPerfil = queryRunner.manager.create(InformacionPerfil, {
-        id_usuario: usuarioGuardado.id_usuario,
-        dni: createUsuarioCompletoDto.dni,
+        usuario: usuarioGuardado,
+        dni: createUsuarioCompletoDto.cc,
         nombres: createUsuarioCompletoDto.nombres,
         apellidos: createUsuarioCompletoDto.apellidos,
-        fecha_nacimiento: createUsuarioCompletoDto.fecha_nacimiento,
-        lugar_nacimiento: createUsuarioCompletoDto.lugar_nacimiento,
-        direccion_facturacion: createUsuarioCompletoDto.direccion_facturacion,
+        fecha_nacimiento: createUsuarioCompletoDto.fechaNacimiento,
+        lugar_nacimiento: createUsuarioCompletoDto.lugarNacimiento,
+        direccion_facturacion: createUsuarioCompletoDto.direccionFacturacion,
         genero: createUsuarioCompletoDto.genero,
-        foto_url: createUsuarioCompletoDto.foto_url
+        foto_url: createUsuarioCompletoDto.imagenUrl
       })
       const informacionGuardada = await queryRunner.manager.save(nuevaInformacionPerfil);
 

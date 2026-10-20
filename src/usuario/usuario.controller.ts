@@ -16,7 +16,6 @@ export class UsuarioController {
   @UseGuards(AuthGuard('jwt'))
   @Get()
   findAll(@Req() req: any) {
-
     if (req.user.rol == 'CLIENTE') {
       throw new ForbiddenException("Se requiere ser administrador para revisar el listado de usuarios")
     }

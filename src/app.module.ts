@@ -10,7 +10,8 @@ import { AuthModule } from './auth/auth.module';
     UsuarioModule,
 
     ConfigModule.forRoot({
-      isGlobal: true
+      isGlobal: true,
+      envFilePath: ['.env', 'env'],
     }),
 
     TypeOrmModule.forRoot({

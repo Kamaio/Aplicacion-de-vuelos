@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, OneToOne } from "typeorm";
 import { Usuario } from "./usuario.entity";
+import { IsOptional } from "class-validator";
 
 @Entity()
 export class InformacionPerfil {
@@ -32,6 +33,7 @@ export class InformacionPerfil {
     @Column()
     genero: string;
 
+    @IsOptional()
     @Column()
     foto_url: string;
 }

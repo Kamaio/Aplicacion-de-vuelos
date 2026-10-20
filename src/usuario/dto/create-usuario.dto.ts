@@ -4,13 +4,13 @@ import { IsDateString, IsEmail, IsInt, IsString} from "class-validator"
 export class CreateUsuarioCompletoDto {
     //informacion de usuario
     @IsString()
-    usuario: string;
+    username: string;
     
     @IsString()
-    contrasena: string;
+    password: string;
     
     @IsEmail()
-    correo: string;
+    email: string;
     
     @IsString()
     rol: string;
@@ -18,7 +18,7 @@ export class CreateUsuarioCompletoDto {
 
     //informacion de informacion perfil
     @IsInt()
-    dni: number;
+    cc: number;
 
     @IsString()
     nombres: string;
@@ -27,17 +27,17 @@ export class CreateUsuarioCompletoDto {
     apellidos: string;
 
     @IsDateString()
-    fecha_nacimiento: Date;
+    fechaNacimiento: Date;
 
     @IsString()
-    lugar_nacimiento: string;
+    lugarNacimiento: string;
 
     @IsString()
-    direccion_facturacion: string;
+    direccionFacturacion: string;
 
     @IsString()
     genero: string;
 
     @IsString()
-    foto_url: string;
+    imagenUrl: string;
 }

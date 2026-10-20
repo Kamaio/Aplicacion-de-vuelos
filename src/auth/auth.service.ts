@@ -19,10 +19,14 @@ export class AuthService {
         const {correo, contrasena} = loginDto;
 
         const usuario = await this.usuarioRepository.findOne({ where: { correo, activo: true } });
-        if (!usuario) { throw new UnauthorizedException('Correo no existente o usuario eliminado'); }
+        if (!usuario) { 
+            console.error(`Usuario con correo ${correo} no encontrado o inactivo.`);
+            throw new UnauthorizedException('Correo no existente o usuario eliminado'); }
 
         const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena);
-        if (!contrasenaValida) { throw new UnauthorizedException('Contraseña incorrecta'); }
+        if (!contrasenaValida) { 
+            console.error(`Contraseña incorrecta para el usuario con correo ${correo} (${contrasena} y ${usuario.contrasena}).`);
+            throw new UnauthorizedException('Contraseña incorrecta'); }
 
         const payLoad = { sub: usuario.id_usuario, correo: usuario.correo, rol: usuario.rol };
 

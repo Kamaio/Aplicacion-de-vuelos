@@ -24,6 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const usuario = await this.usuarioRepository.findOne({ where: { id_usuario, activo: true }});
 
     if (!usuario) {
+      console.error(`Usuario con ID ${id_usuario} no encontrado o inactivo.`);
       throw new UnauthorizedException('Token no válido o usuario inexistente');
     }
 
