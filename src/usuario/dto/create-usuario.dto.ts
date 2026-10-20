@@ -1,5 +1,5 @@
 
-import { IsDateString, IsEmail, IsInt, IsString} from "class-validator"
+import { IsDateString, IsEmail, IsInt, IsOptional, IsString} from "class-validator"
 
 export class CreateUsuarioCompletoDto {
     //informacion de usuario
@@ -38,6 +38,7 @@ export class CreateUsuarioCompletoDto {
     @IsString()
     genero: string;
 
+    @IsOptional()
     @IsString()
     imagenUrl: string;
 }

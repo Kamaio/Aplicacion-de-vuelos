@@ -73,6 +73,11 @@ export class UsuarioService {
     return await this.usuarioRepository.find({where: {activo: true}, relations: {informacionPerfil: true}});
   }
 
+  async findAdministradores() {
+    console.log("Buscando administradores activos...");
+    return await this.usuarioRepository.find({where: {rol: 'ADMIN', activo: true}, relations: {informacionPerfil: true}});
+  }
+
   async findOne(id: number) {
     return await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}, relations: {informacionPerfil: true}});
   }
