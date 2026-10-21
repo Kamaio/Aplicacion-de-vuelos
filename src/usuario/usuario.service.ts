@@ -32,7 +32,7 @@ export class UsuarioService {
 
         usuario: createUsuarioCompletoDto.usuario,
         contrasena: contrasenaHasheada,
-        correo: createUsuarioCompletoDto.correo,
+        correo: createUsuarioCompletoDto.email,
         rol: createUsuarioCompletoDto.rol,
         activo: true
       })
@@ -56,7 +56,7 @@ export class UsuarioService {
 
       return {
         message: 'Usuario creado exitosamente',
-        usuario: usuarioGuardado,
+        usuario: this.mapUsuario(usuarioGuardado),
         informacionPerfil: informacionGuardada
       }
     }
@@ -75,28 +75,26 @@ export class UsuarioService {
       relations: { informacionPerfil: true }
     });
 
-    return usuarios.map(usuario => ({
-      id_usuario: usuario.id_usuario,
-      usuario: usuario.usuario,
-      correo: usuario.correo,
-      rol: usuario.rol,
-      cc: usuario.informacionPerfil?.dni,
-      nombres: usuario.informacionPerfil?.nombres,
-      apellidos: usuario.informacionPerfil?.apellidos,
-      fechaNacimiento: usuario.informacionPerfil?.fecha_nacimiento,
-      lugarNacimiento: usuario.informacionPerfil?.lugar_nacimiento,
-      genero: usuario.informacionPerfil?.genero,
-      direccionFacturacion: usuario.informacionPerfil?.direccion_facturacion
-    }));
+    return usuarios.map(usuario => this.mapUsuario(usuario));
   }
 
   async findAdministradores() {
     console.log("Buscando administradores activos...");
-    return await this.usuarioRepository.find({where: {rol: 'ADMIN', activo: true}, relations: {informacionPerfil: true}});
+    const administradores = await this.usuarioRepository.find({
+      where: { rol: 'ADMIN', activo: true },
+      relations: { informacionPerfil: true }
+    });
+
+    return administradores.map(usuario => this.mapUsuario(usuario));
   }
 
   async findOne(id: number) {
-    return await this.usuarioRepository.findOne({where: {id_usuario: id, activo: true}, relations: {informacionPerfil: true}});
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id_usuario: id, activo: true },
+      relations: { informacionPerfil: true }
+    });
+
+    return usuario ? this.mapUsuario(usuario) : null;
   }
 
   async update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
@@ -109,45 +107,36 @@ export class UsuarioService {
       throw new NotFoundException("Usuario con id ${id} no encontrado");
     }
 
-    const dto = updateUsuarioDto as any;
-
     // 1. Actualizar campos de la entidad principal 'Usuario'
-    if (dto.usuario !== undefined) usuario.usuario = dto.usuario;
-    if (dto.correo !== undefined) usuario.correo = dto.correo;
-    if (dto.rol !== undefined) usuario.rol = dto.rol;
+    if (updateUsuarioDto.usuario !== undefined) usuario.usuario = updateUsuarioDto.usuario;
+    if (updateUsuarioDto.email !== undefined) usuario.correo = updateUsuarioDto.email;
+    if (updateUsuarioDto.rol !== undefined) usuario.rol = updateUsuarioDto.rol;
     
-    if (dto.contrasena !== undefined && dto.contrasena.trim() !== '') {
+    if (updateUsuarioDto.password !== undefined && updateUsuarioDto.password.trim() !== '') {
       const saltRounds = 10;
-      usuario.contrasena = await bcrypt.hash(dto.contrasena, saltRounds);
+      usuario.contrasena = await bcrypt.hash(updateUsuarioDto.password, saltRounds);
     }
-
-    // 2. Extraer datos del perfil (ya sea si vienen anidados en informacionPerfil o planos)
-    const perfilData = dto.informacionPerfil || dto;
 
     if (usuario.informacionPerfil) {
-      if (perfilData.direccion_facturacion !== undefined) {
-        usuario.informacionPerfil.direccion_facturacion = perfilData.direccion_facturacion;
-      } else if (perfilData.direccionFacturacion !== undefined) {
-        usuario.informacionPerfil.direccion_facturacion = perfilData.direccionFacturacion;
+      if (updateUsuarioDto.cc !== undefined) usuario.informacionPerfil.dni = updateUsuarioDto.cc;
+      if (updateUsuarioDto.nombres !== undefined) usuario.informacionPerfil.nombres = updateUsuarioDto.nombres;
+      if (updateUsuarioDto.apellidos !== undefined) usuario.informacionPerfil.apellidos = updateUsuarioDto.apellidos;
+      if (updateUsuarioDto.fechaNacimiento !== undefined) {
+        usuario.informacionPerfil.fecha_nacimiento = updateUsuarioDto.fechaNacimiento;
       }
-
-      if (perfilData.foto_url !== undefined) {
-        usuario.informacionPerfil.foto_url = perfilData.foto_url;
-      } else if (perfilData.imagenUrl !== undefined) {
-        usuario.informacionPerfil.foto_url = perfilData.imagenUrl;
+      if (updateUsuarioDto.lugarNacimiento !== undefined) {
+        usuario.informacionPerfil.lugar_nacimiento = updateUsuarioDto.lugarNacimiento;
       }
-
-      if (perfilData.dni !== undefined) usuario.informacionPerfil.dni = perfilData.dni;
-      if (perfilData.nombres !== undefined) usuario.informacionPerfil.nombres = perfilData.nombres;
-      if (perfilData.apellidos !== undefined) usuario.informacionPerfil.apellidos = perfilData.apellidos;
+      if (updateUsuarioDto.direccionFacturacion !== undefined) {
+        usuario.informacionPerfil.direccion_facturacion = updateUsuarioDto.direccionFacturacion;
+      }
+      if (updateUsuarioDto.genero !== undefined) usuario.informacionPerfil.genero = updateUsuarioDto.genero;
+      if (updateUsuarioDto.imagenUrl !== undefined) usuario.informacionPerfil.foto_url = updateUsuarioDto.imagenUrl;
     }
 
-    // 3. Guardar la entidad (gracias a cascade: true actualizará ambas tablas en PostgreSQL)
     await this.usuarioRepository.save(usuario);
 
-    // 4. Retornar el usuario actualizado completo para que Angular refresque la UI inmediatamente
-    console.log("Usuario actualizado:", usuario);
-    return usuario;
+    return this.mapUsuario(usuario);
   }
 
   async remove(id: number) {
@@ -159,5 +148,24 @@ export class UsuarioService {
     usuario.activo = false;
     await this.usuarioRepository.save(usuario);
     return { message: `Usuario con id ${id} eliminado exitosamente` };
+  }
+
+  private mapUsuario(usuario: Usuario) {
+    const perfil = usuario.informacionPerfil;
+
+    return {
+      id_usuario: usuario.id_usuario,
+      usuario: usuario.usuario,
+      email: usuario.correo,
+      rol: usuario.rol,
+      cc: perfil?.dni,
+      nombres: perfil?.nombres,
+      apellidos: perfil?.apellidos,
+      fechaNacimiento: perfil?.fecha_nacimiento,
+      lugarNacimiento: perfil?.lugar_nacimiento,
+      direccionFacturacion: perfil?.direccion_facturacion,
+      genero: perfil?.genero,
+      imagenUrl: perfil?.foto_url
+    };
   }
 }

@@ -3,7 +3,7 @@ import { IsEmail, IsString } from "class-validator";
 export class LoginDto {
 
     @IsEmail()
-    correo: string;
+    email: string;
 
     @IsString()
     contrasena: string;

@@ -10,7 +10,7 @@ export class CreateUsuarioCompletoDto {
     password: string;
     
     @IsEmail()
-    correo: string;
+    email: string;
     
     @IsString()
     rol: string;
