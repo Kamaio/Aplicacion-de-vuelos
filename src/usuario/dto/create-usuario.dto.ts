@@ -4,13 +4,13 @@ import { IsDateString, IsEmail, IsInt, IsOptional, IsString} from "class-validat
 export class CreateUsuarioCompletoDto {
     //informacion de usuario
     @IsString()
-    username: string;
+    usuario: string;
     
     @IsString()
     password: string;
     
     @IsEmail()
-    email: string;
+    correo: string;
     
     @IsString()
     rol: string;

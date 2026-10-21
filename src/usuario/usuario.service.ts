@@ -30,9 +30,9 @@ export class UsuarioService {
 
       const nuevoUsuario = queryRunner.manager.create(Usuario, {
 
-        usuario: createUsuarioCompletoDto.username,
+        usuario: createUsuarioCompletoDto.usuario,
         contrasena: contrasenaHasheada,
-        correo: createUsuarioCompletoDto.email,
+        correo: createUsuarioCompletoDto.correo,
         rol: createUsuarioCompletoDto.rol,
         activo: true
       })
