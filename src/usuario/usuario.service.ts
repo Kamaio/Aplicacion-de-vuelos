@@ -77,8 +77,8 @@ export class UsuarioService {
 
     return usuarios.map(usuario => ({
       id_usuario: usuario.id_usuario,
-      username: usuario.usuario,
-      email: usuario.correo,
+      usuario: usuario.usuario,
+      correo: usuario.correo,
       rol: usuario.rol,
       cc: usuario.informacionPerfil?.dni,
       nombres: usuario.informacionPerfil?.nombres,
