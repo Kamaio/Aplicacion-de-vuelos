@@ -18,7 +18,7 @@ export class AuthService {
     async login(loginDto: LoginDto) {
         const { email, contrasena } = loginDto;
 
-        const usuario = await this.usuarioRepository.findOne({ where: { correo: email, activo: true } });
+        const usuario = await this.usuarioRepository.findOne({ where: { correo: email, activo: true }, relations: { informacionPerfil: true } });
         if (!usuario) { 
             console.error(`Usuario con correo ${email} no encontrado o inactivo.`);
             throw new UnauthorizedException('Correo no existente o usuario eliminado'); }
@@ -37,6 +37,7 @@ export class AuthService {
                 id_usuario: usuario.id_usuario,
                 email: usuario.correo,
                 rol: usuario.rol,
+                nombres: usuario.informacionPerfil?.nombres || usuario.usuario, //Cambios para poder ver en navbar nombres
             }
         };
         
