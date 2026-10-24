@@ -18,10 +18,16 @@ export class AuthService {
     async login(loginDto: LoginDto) {
         const { email, contrasena } = loginDto;
 
-        const usuario = await this.usuarioRepository.findOne({ where: { correo: email, activo: true }, relations: { informacionPerfil: true } });
+        let usuario = await this.usuarioRepository.findOne({ where: { correo: email, activo: true }, relations: { informacionPerfil: true } });
         if (!usuario) { 
-            console.error(`Usuario con correo ${email} no encontrado o inactivo.`);
-            throw new UnauthorizedException('Correo no existente o usuario eliminado'); }
+            //si no se encuentra el usuario por correo, intentar buscarlo por nombre de usuario
+            usuario = await this.usuarioRepository.findOne({ where: { usuario: email }, relations: { informacionPerfil: true } });
+
+            if (!usuario) {
+                console.error(`Usuario ${email} no encontrado o inactivo.`);
+                throw new UnauthorizedException('usuario no existente o usuario eliminado'); 
+            }
+        }
 
         const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena);
         if (!contrasenaValida) { 

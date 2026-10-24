@@ -1,12 +1,13 @@
 
 import { IsDateString, IsEmail, IsInt, IsOptional, IsString} from "class-validator"
+import { EsContrasena } from "../decoradores/contrasenaValidator";
 
 export class CreateUsuarioCompletoDto {
     //informacion de usuario
     @IsString()
     usuario: string;
     
-    @IsString()
+    @EsContrasena()
     password: string;
     
     @IsEmail()
