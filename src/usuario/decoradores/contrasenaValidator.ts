@@ -17,7 +17,7 @@ export function EsContrasena(validationOptions?: ValidationOptions) {
                 },
 
                 defaultMessage(args: ValidationArguments) {
-                return "${args.property} debe tener al menos 8 caracteres, incluir letras y números.";
+                return "Contraseña invalida. Debe tener al menos 8 caracteres, incluir letras y números.";
                 },
             },
         });
