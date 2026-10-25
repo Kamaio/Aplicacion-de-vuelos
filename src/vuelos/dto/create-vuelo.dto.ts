@@ -1,4 +1,4 @@
-import { IsString } from "class-validator";
+import { IsNumber, IsString } from "class-validator";
 
 export class CreateVueloDto {
     //id: number; lo tiene andrea pero yo no le doy uso
@@ -6,19 +6,32 @@ export class CreateVueloDto {
     @IsString()
     codigo: string;
 
+    //tipo
+
     @IsString()
     origen: string;
 
     @IsString()
     destino: string;
 
-    
-    fechaHora: string; //estan juntos y deberian estar separados entonces lo dejo para editar luego
+    @IsString()
+    fecha: string;
 
+    @IsString()
+    horaVuelo: string;
 
-    precio: number; //estos son 2 precios entonces se debe dividir en 2
+    @IsString()
+    horaLlegada: string
+
+    @IsNumber()
+    precioEconomico: number;
+
+    @IsNumber()
+    precioPrimera: number;
 
     @IsString()
     estado: 'Programado' | 'Realizado' | 'Cancelado';
+
+    @IsNumber()
     reservasCount?: number; 
 }
