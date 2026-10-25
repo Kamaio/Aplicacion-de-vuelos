@@ -16,21 +16,36 @@ export class VuelosService {
   ) {}
 
 
-  async create(createVueloDto: CreateVueloDto) {
+  async create(id: number, createVueloDto: CreateVueloDto) {
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+    const internacional = ["Miami (MIA)", "Madrid (MAD)", "Londres (LON)", "Nueva York (NYC)", "Buenos Aires (BUE)"]
+    let tipo, capacidad;
+
+    if (internacional.includes(createVueloDto.destino)) {
+      tipo = "Internacional";
+      capacidad = 250;
+    }
+    else tipo = "Nacional"; capacidad = 150;
+
     try {
       const nuevoVuelo = queryRunner.manager.create(Vuelo, {
-        //usuario: createUsuarioCompletoDto.usuario,
-        //contrasena: contrasenaHasheada,
-        //correo: createUsuarioCompletoDto.email,
-        //rol: createUsuarioCompletoDto.rol,
-        //activo: true
-        }
-      )
+        codigo_vuelo: createVueloDto.codigo,
+        tipo_vuelo: tipo,
+        origen: createVueloDto.origen,
+        destino: createVueloDto.destino,
+        fecha_vuelo: createVueloDto.fecha,
+        hora_vuelo: createVueloDto.horaVuelo,
+        hora_llegada: createVueloDto.horaLlegada,
+        costo_economico: createVueloDto.precioEconomico,
+        costo_primera: createVueloDto.precioPrimera,
+        capacidad_total: capacidad,
+        estado: "Programado",
+        id_admin: id
+      })
       const vueloGuardado = queryRunner.manager.save(nuevoVuelo);
 
       await queryRunner.commitTransaction();

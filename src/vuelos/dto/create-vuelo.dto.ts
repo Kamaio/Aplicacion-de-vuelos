@@ -1,6 +1,7 @@
 import { IsNumber, IsString } from "class-validator";
 
 export class CreateVueloDto {
+    @IsNumber()
     id: number; // lo tiene andrea pero yo no le doy uso
 
     @IsString()

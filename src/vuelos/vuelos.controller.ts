@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req } from '@nestjs/common';
 import { VuelosService } from './vuelos.service';
 import { CreateVueloDto } from './dto/create-vuelo.dto';
 import { UpdateVueloDto } from './dto/update-vuelo.dto';
@@ -9,9 +9,10 @@ import { AuthGuard } from '@nestjs/passport';
 export class VuelosController {
   constructor(private readonly vuelosService: VuelosService) {}
 
+  @UseGuards(AuthGuard('jwt'))
   @Post()
-  create(@Body() createVueloDto: CreateVueloDto) {
-    return this.vuelosService.create(createVueloDto);
+  create(@Body() createVueloDto: CreateVueloDto, @Req() req: any) {
+    return this.vuelosService.create(req.user.id_usuario , createVueloDto);
   }
 
   @Get()
