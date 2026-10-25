@@ -40,4 +40,13 @@ export class Vuelo {
 
     @Column()
     id_admin: number;
+
+    @Column()
+    reservas_total: number
+    
+    @Column()
+    duracion: string
+
+    @Column()
+    fecha_llegada: string
 }
