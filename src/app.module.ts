@@ -3,6 +3,7 @@ import { UsuarioModule } from './usuario/usuario.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
+import { VuelosModule } from './vuelos/vuelos.module';
 
 
 @Module({
@@ -32,6 +33,7 @@ import { AuthModule } from './auth/auth.module';
 
     AuthModule,
 
+    VuelosModule,
 
 
     
