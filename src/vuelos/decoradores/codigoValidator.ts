@@ -17,7 +17,7 @@ export function EsCodigo(validationOptions?: ValidationOptions) {
                 },
 
                 defaultMessage(args: ValidationArguments) {
-                return "Nombre de usuario invalido";
+                return "Codigo invalido. Estructura: GA en mayusculas, un guion pegado y 4 números.";
                 },
             },
         });
