@@ -1,9 +1,11 @@
 import { IsNumber, IsString } from "class-validator";
+import { EsCodigo } from "../decoradores/codigoValidator";
 
 export class CreateVueloDto {
     //@IsNumber()
     //id: number; // lo tiene andrea pero yo no le doy uso
 
+    @EsCodigo()
     @IsString()
     codigo: string;
 

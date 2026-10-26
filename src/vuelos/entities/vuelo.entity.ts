@@ -5,6 +5,7 @@ export class Vuelo {
     @PrimaryGeneratedColumn()
     id_vuelo: number;
 
+    
     @Column()
     codigo_vuelo: string;
 
