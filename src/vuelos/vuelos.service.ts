@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateVueloDto } from './dto/create-vuelo.dto';
 import { UpdateVueloDto } from './dto/update-vuelo.dto';
+import { BusquedaParametrizadaDto } from './dto/busquedaParametrizada.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Vuelo } from './entities/vuelo.entity';
 import { DataSource, Repository } from 'typeorm';
@@ -86,6 +87,34 @@ export class VuelosService {
       where: { estado: 'Programado' },
     });
     return vuelosProgramados.map(vuelo => this.mapVuelos(vuelo));
+  }
+
+  async findParametrizada(busquedaParametrizadaDto: BusquedaParametrizadaDto) {
+    const { origen, destino, fecha, precioMaximo } = busquedaParametrizadaDto;
+
+    //basica con solo los que estan programados
+    const query = this.vueloRepository.createQueryBuilder('vuelo').where('vuelo.estado = :estado', { estado: 'Programado' });
+
+    //el resto de vainas si es que las envian
+    if (origen) {
+      query.andWhere('vuelo.origen = :origen', { origen });
+    }
+
+    if (destino) {
+      query.andWhere('vuelo.destino = :destino', { destino });
+    }
+
+    if (fecha) {
+      query.andWhere('vuelo.fecha_vuelo = :fecha', { fecha });
+    }
+
+    if (precioMaximo) {
+      query.andWhere('vuelo.costo_economico <= :precioMaximo', { precioMaximo });
+    }
+
+    const vuelosProgramados = await query.getMany();
+
+    return vuelosProgramados.map((vuelo) => this.mapVuelos(vuelo));
   }
 
   async findOne(id: number) {

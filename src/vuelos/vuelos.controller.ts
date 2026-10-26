@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Req } from '@nestjs/
 import { VuelosService } from './vuelos.service';
 import { CreateVueloDto } from './dto/create-vuelo.dto';
 import { UpdateVueloDto } from './dto/update-vuelo.dto';
+import { BusquedaParametrizadaDto } from './dto/busquedaParametrizada.dto';
 import { UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -23,6 +24,11 @@ export class VuelosController {
   @Get('programados')
   findProgramados() {
     return this.vuelosService.findProgramados();
+  }
+
+  @Get('busquedaParametrizada')
+  findParametrizada(@Body() busquedaParametrizadaDto: BusquedaParametrizadaDto) {
+    return this.vuelosService.findParametrizada(busquedaParametrizadaDto);
   }
 
   @Get(':id')
