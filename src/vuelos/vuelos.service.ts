@@ -95,8 +95,27 @@ export class VuelosService {
     return vuelo ? this.mapVuelos(vuelo) : null;
   }
 
-  update(id: number, updateVueloDto: UpdateVueloDto) {
-    return `This action updates a #${id} vuelo`;
+  async update(id: number, updateVueloDto: UpdateVueloDto) {
+    const vuelo = await this.vueloRepository.findOne({where: {id_vuelo: id}});
+
+    if (!vuelo) {
+      throw new NotFoundException("Vuelo con id ${id} no encontrado");
+    }
+
+    //traidos del front
+    if (updateVueloDto.fecha !== undefined) vuelo.fecha_vuelo = updateVueloDto.fecha;
+    if (updateVueloDto.horaVuelo !== undefined) vuelo.hora_vuelo = updateVueloDto.horaVuelo;
+    if (updateVueloDto.precioEconomico !== undefined) vuelo.costo_economico = updateVueloDto.precioEconomico;
+    if (updateVueloDto.precioPrimera !== undefined) vuelo.costo_primera = updateVueloDto.precioPrimera;
+
+    //actualizados al actualizar hora vuelo y fecha vuelo
+    const llegada = this.calcularHoraLlegada(vuelo.fecha_vuelo, vuelo.hora_vuelo, vuelo.duracion, vuelo.destino);
+    vuelo.fecha_llegada = llegada.fechaLlegada;
+    vuelo.hora_llegada = llegada.horaLlegada;
+
+    await this.vueloRepository.save(vuelo);
+
+    return this.mapVuelos(vuelo);
   }
 
   async remove(id: number) {
