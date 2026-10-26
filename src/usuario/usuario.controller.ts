@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioCompletoDto } from './dto/create-usuario.dto';
+import { CreateAdminDto } from './dto/createAdmin.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -11,6 +12,11 @@ export class UsuarioController {
   @Post()
   create(@Body() createUsuarioCompletoDto: CreateUsuarioCompletoDto) {
     return this.usuarioService.create(createUsuarioCompletoDto);
+  }
+
+  @Post('crearAdmin')
+  createAdmin(@Body() createAdminDto: CreateAdminDto) {
+    return this.usuarioService.createAdmin(createAdminDto);
   }
 
   @UseGuards(AuthGuard('jwt'))

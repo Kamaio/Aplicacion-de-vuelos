@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUsuarioCompletoDto } from './dto/create-usuario.dto';
+import { CreateAdminDto } from './dto/createAdmin.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Usuario } from './entities/usuario.entity';
@@ -49,6 +50,57 @@ export class UsuarioService {
         direccion_facturacion: createUsuarioCompletoDto.direccionFacturacion,
         genero: createUsuarioCompletoDto.genero,
         foto_url: createUsuarioCompletoDto.imagenUrl
+      })
+      const informacionGuardada = await queryRunner.manager.save(nuevaInformacionPerfil);
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: 'Usuario creado exitosamente',
+        usuario: this.mapUsuario(usuarioGuardado),
+        informacionPerfil: informacionGuardada
+      }
+    }
+    catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    }
+    finally{
+      await queryRunner.release();
+    }
+  }
+
+  async createAdmin(createAdminDto: CreateAdminDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try{
+      const saltRounds = 10;
+      const contrasenaHasheada = await bcrypt.hash(createAdminDto.password, saltRounds);
+
+      const nuevoUsuario = queryRunner.manager.create(Usuario, {
+
+        usuario: createAdminDto.usuario,
+        contrasena: contrasenaHasheada,
+        correo: createAdminDto.email,
+        rol: createAdminDto.rol,
+        activo: true
+      })
+      const usuarioGuardado = await queryRunner.manager.save(nuevoUsuario);
+
+
+      const nuevaInformacionPerfil = queryRunner.manager.create(InformacionPerfil, {
+        usuario: usuarioGuardado,
+        dni: createAdminDto.cc,
+        //nombres: createAdminDto.nombres,
+        //apellidos: createAdminDto.apellidos,
+        //fecha_nacimiento: createAdminDto.fechaNacimiento,
+        //lugar_nacimiento: createAdminDto.lugarNacimiento,
+        //direccion_facturacion: createAdminDto.direccionFacturacion,
+        //genero: createAdminDto.genero,
+        //foto_url: createAdminDto.imagenUrl
       })
       const informacionGuardada = await queryRunner.manager.save(nuevaInformacionPerfil);
 
