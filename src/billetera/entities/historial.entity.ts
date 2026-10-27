@@ -15,6 +15,9 @@ export class Historial {
   @Column()
   id_billetera: number;
 
+  @Column()
+  monto: number;
+
   @ManyToOne(() => Billetera, (billetera) => billetera.historial)
   @JoinColumn({ name: 'id_billetera' })
   billetera: Billetera;

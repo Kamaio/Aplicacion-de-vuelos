@@ -89,9 +89,10 @@ export class BilleteraService {
     if (updateBilleteraDto.monto !== undefined) billetera.saldo += updateBilleteraDto.monto;
 
     await this.historialRepository.save({
-      info_historial: `Se incremento el saldo de la billetera en: ${updateBilleteraDto.monto}, quedando un total de: ${billetera.saldo}`,
+      info_historial: `Se incremento el saldo de la billetera quedando un total de: ${billetera.saldo}`,
       fecha_transaccion: new Date(),
       id_billetera: billetera.id_billetera,
+      monto: updateBilleteraDto.monto
     });
 
     await this.billeteraRepository.save(billetera);
@@ -115,6 +116,7 @@ export class BilleteraService {
       info_historial: `Se eliminó la tarjeta terminada en ${tarjeta.numero_tarjeta.slice(-4)}`,
       fecha_transaccion: new Date(),
       id_billetera: tarjeta.id_billetera,
+      monto: 0
     });
 
     await this.tarjetaRepository.delete(idTarjeta);
