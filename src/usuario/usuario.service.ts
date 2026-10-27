@@ -7,6 +7,7 @@ import { Usuario } from './entities/usuario.entity';
 import { DataSource, Repository } from 'typeorm';
 import { InformacionPerfil } from './entities/informacionPerfil.entity';
 import * as bcrypt from 'bcrypt';
+import { Billetera } from '../billetera/entities/billetera.entity';
 
 @Injectable()
 export class UsuarioService {
@@ -53,12 +54,20 @@ export class UsuarioService {
       })
       const informacionGuardada = await queryRunner.manager.save(nuevaInformacionPerfil);
 
+      //billetera creada automaticamente
+      const nuevaBilletera = queryRunner.manager.create(Billetera, {
+        id_usuario: usuarioGuardado.id_usuario,
+        saldo: 0,
+      });
+      const billeteraGuardada = await queryRunner.manager.save(nuevaBilletera);
+
       await queryRunner.commitTransaction();
 
       return {
         message: 'Usuario creado exitosamente',
         usuario: this.mapUsuario(usuarioGuardado),
-        informacionPerfil: informacionGuardada
+        informacionPerfil: informacionGuardada,
+        billetera: billeteraGuardada //pa que la muestre cuando cree los nuevos usuarios que incluyan esta vaina si sabe
       }
     }
     catch (error) {

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { VuelosModule } from './vuelos/vuelos.module';
+import { BilleteraModule } from './billetera/billetera.module';
 
 
 @Module({
@@ -34,6 +35,8 @@ import { VuelosModule } from './vuelos/vuelos.module';
     AuthModule,
 
     VuelosModule,
+
+    BilleteraModule,
 
 
     
