@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query} from '@nestjs/common';
 import { BilleteraService } from './billetera.service';
 import { CreateBilleteraDto } from './dto/create-billetera.dto';
 import { CreateTarjetaDto } from './dto/create-tarjeta.dto';
@@ -29,9 +29,8 @@ export class BilleteraController {
     return this.billeteraService.updateSaldo(updateBilleteraDto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: any) {
-    return this.billeteraService.remove(+id, req.usuario.id_usuario);
+  remove(@Param('id') id: string, @Query('idUsuario') idUsuario: number,) {
+    return this.billeteraService.remove(+id, idUsuario);
   }
 }

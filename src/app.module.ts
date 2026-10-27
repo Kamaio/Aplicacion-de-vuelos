@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { VuelosModule } from './vuelos/vuelos.module';
 import { BilleteraModule } from './billetera/billetera.module';
+import { CompraReservaModule } from './compra-reserva/compra-reserva.module';
 
 
 @Module({
@@ -37,6 +38,8 @@ import { BilleteraModule } from './billetera/billetera.module';
     VuelosModule,
 
     BilleteraModule,
+
+    CompraReservaModule,
 
 
     
