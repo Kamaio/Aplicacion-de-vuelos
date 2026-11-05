@@ -63,8 +63,9 @@ export class CompraReservaService {
     return reservas.map(reserva => this.mapReserva(reserva));
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} compraReserva`;
+  async remove(id: number) {
+    await this.compraReservaRepository.delete(id);
+    return { message: `Reserva con ID ${id} eliminada permanentemente` };
   }
 
   private mapReserva(reserva: CompraReserva) {
