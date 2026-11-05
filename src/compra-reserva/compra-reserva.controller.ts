@@ -12,19 +12,9 @@ export class CompraReservaController {
     return this.compraReservaService.create(createCompraReservaDto);
   }
 
-  @Get()
-  findAll() {
-    return this.compraReservaService.findAll();
-  }
-
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.compraReservaService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCompraReservaDto: UpdateCompraReservaDto) {
-    return this.compraReservaService.update(+id, updateCompraReservaDto);
   }
 
   @Delete(':id')

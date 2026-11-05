@@ -53,22 +53,14 @@ export class CompraReservaService {
       await queryRunner.release();
     }
 
-
-
-
-    return 'This action adds a new compraReserva';
   }
 
-  findAll() {
-    return `This action returns all compraReserva`;
-  }
+  async findOne(id: number) {
+    const reservas = await this.compraReservaRepository.find({
+      where: { id_usuario: id }
+    });
 
-  findOne(id: number) {
-    return `This action returns a #${id} compraReserva`;
-  }
-
-  update(id: number, updateCompraReservaDto: UpdateCompraReservaDto) {
-    return `This action updates a #${id} compraReserva`;
+    return reservas.map(reserva => this.mapReserva(reserva));
   }
 
   remove(id: number) {
