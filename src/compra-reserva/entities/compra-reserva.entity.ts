@@ -24,13 +24,12 @@ export class CompraReserva {
     @Column()
     fecha_reserva: Date
 
-    @Column()
-    fecha_limite_pago: Date
+    @Column({ type: 'timestamp', nullable: true })
+    fecha_limite_pago: Date | null
 
     @Column()
     id_vuelo: number
 
-    @IsOptional()
-    @Column()
-    fecha_pago: Date
+    @Column({ type: 'timestamp', nullable: true })
+    fecha_pago: Date | null
 }

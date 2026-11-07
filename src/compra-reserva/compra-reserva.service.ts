@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { CreateCompraReservaDto } from './dto/create-compra-reserva.dto';
 import { UpdateCompraReservaDto } from './dto/update-compra-reserva.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,6 +18,14 @@ export class CompraReservaService {
 
 
   async create(createCompraReservaDto: CreateCompraReservaDto) {
+    const reservaExistente = await this.compraReservaRepository.findOne({
+      where: { id_vuelo: createCompraReservaDto.idVuelo }
+    });
+
+    if (reservaExistente) {
+      throw new ConflictException('Este usuario ya tiene una reserva para este vuelo.');
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
@@ -31,9 +39,9 @@ export class CompraReservaService {
         estado: createCompraReservaDto.estado,
         metodo_pago: createCompraReservaDto.metodoPago,
         fecha_reserva: createCompraReservaDto.fechaReserva,
-        fecha_limite_pago: createCompraReservaDto.fechaLimitePago,
+        fecha_limite_pago: createCompraReservaDto.fechaLimitePago ? createCompraReservaDto.fechaLimitePago : null,
         id_vuelo: createCompraReservaDto.idVuelo,
-        //fecha_pago:
+        fecha_pago: createCompraReservaDto.fechaPago ? createCompraReservaDto.fechaPago : null
       })
       const reservaGuardada = await queryRunner.manager.save(nuevoReserva);
 

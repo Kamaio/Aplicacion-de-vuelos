@@ -1,4 +1,4 @@
-import { IsDateString, IsNumber, IsString } from "class-validator"
+import { IsDateString, IsNumber, IsOptional, IsString } from "class-validator"
 
 export class CreateCompraReservaDto {
     @IsString()
@@ -8,7 +8,12 @@ export class CreateCompraReservaDto {
     estado: string
 
     @IsDateString()
+    @IsOptional()
     fechaLimitePago: Date
+
+    @IsDateString()
+    @IsOptional()
+    fechaPago: Date
 
     @IsDateString()
     fechaReserva: Date
