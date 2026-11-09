@@ -41,7 +41,21 @@ export class CompraReservaService {
         fecha_reserva: createCompraReservaDto.fechaReserva,
         fecha_limite_pago: createCompraReservaDto.fechaLimitePago ? createCompraReservaDto.fechaLimitePago : null,
         id_vuelo: createCompraReservaDto.idVuelo,
-        fecha_pago: createCompraReservaDto.fechaPago ? createCompraReservaDto.fechaPago : null
+        fecha_pago: createCompraReservaDto.fechaPago ? createCompraReservaDto.fechaPago : null,
+
+        pasajeros: createCompraReservaDto.pasajeros.map(pasajeroDto => ({
+          nombre: pasajeroDto.nombreCompleto,
+          dni: pasajeroDto.documento,
+          fecha_nacimiento: pasajeroDto.fechaNacimiento,
+          genero: pasajeroDto.genero,
+          telefono: pasajeroDto.telefono,
+          correo: pasajeroDto.email,
+          nombre_contacto: pasajeroDto.nombreContacto,
+          telefono_contacto: pasajeroDto.telefonoContacto,
+          id_silla: 16,
+          cambios_silla: 0,
+          checkin_realizado: false
+        }))
       })
       const reservaGuardada = await queryRunner.manager.save(nuevoReserva);
 

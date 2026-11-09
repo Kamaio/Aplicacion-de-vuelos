@@ -1,5 +1,5 @@
-import { IsOptional } from "class-validator";
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from "typeorm";
+import { Pasajero } from "./pasajero.entity";
 
 @Entity('compra_reserva')
 export class CompraReserva {
@@ -32,4 +32,7 @@ export class CompraReserva {
 
     @Column({ type: 'timestamp', nullable: true })
     fecha_pago: Date | null
+
+    @OneToMany(() => Pasajero, (pasajero) => pasajero.compraReserva, { cascade: true })
+    pasajeros: Pasajero[];
 }
