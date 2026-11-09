@@ -1,4 +1,6 @@
-import { IsDateString, IsNumber, IsOptional, IsString } from "class-validator"
+import { Type } from "class-transformer"
+import { IsDateString, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator"
+import { CreatePasajeroDto } from "./createPasajero.dto"
 
 export class CreateCompraReservaDto {
     @IsString()
@@ -29,4 +31,15 @@ export class CreateCompraReservaDto {
 
     @IsNumber()
     montoTotal: number
+
+    //cosas para los pasajeros
+    @IsString()
+    clase: string
+
+    @IsNumber()
+    cantidadPasajeros: number
+
+    @ValidateNested({ each: true })
+    @Type(() => CreatePasajeroDto)
+    pasajeros: CreatePasajeroDto[];
 }
