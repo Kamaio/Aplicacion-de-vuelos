@@ -14,8 +14,13 @@ export class BilleteraController {
     return this.billeteraService.createTarjeta(createTarjetaDto);
   }
 
-  @Get(':id')
+  @Get('usuario/:id')
   findOne(@Param('id') id: string) {
+    return this.billeteraService.findOne(+id);
+  }
+
+  @Get(':id')
+  findOne1(@Param('id') id: string) {
     return this.billeteraService.findOne(+id);
   }
 
