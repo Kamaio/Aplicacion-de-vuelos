@@ -52,7 +52,7 @@ export class CompraReservaService {
           correo: pasajeroDto.email,
           nombre_contacto: pasajeroDto.nombreContacto,
           telefono_contacto: pasajeroDto.telefonoContacto,
-          id_silla: 16,
+          id_silla: null,
           cambios_silla: 0,
           checkin_realizado: false
         }))
