@@ -5,6 +5,7 @@ import { BusquedaParametrizadaDto } from './dto/busquedaParametrizada.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Vuelo } from './entities/vuelo.entity';
 import { DataSource, Repository } from 'typeorm';
+import { Silla } from './entities/sillas.entity';
 
 @Injectable()
 export class VuelosService {
@@ -12,7 +13,8 @@ export class VuelosService {
   constructor(
     @InjectRepository(Vuelo)
     private readonly vueloRepository: Repository<Vuelo>,
-    
+    @InjectRepository(Silla)
+    private readonly sillaRepository: Repository<Silla>,
     private readonly dataSource: DataSource
   ) {}
 
@@ -58,6 +60,17 @@ export class VuelosService {
         fecha_llegada: Llegada.fechaLlegada
       })
       const vueloGuardado = await queryRunner.manager.save(nuevoVuelo);
+
+      //sillas asquerosas
+      const sillas = this.generarEstructuraSillas(capacidad);
+
+      const sillasParaInsertar = sillas.map(silla => ({
+      ...silla,
+      id_vuelo: vueloGuardado.id_vuelo,
+      }));
+
+      await queryRunner.manager.insert(Silla, sillasParaInsertar);
+
 
       await queryRunner.commitTransaction();
 
@@ -220,4 +233,37 @@ export class VuelosService {
       horaLlegada,   // Ej: "07:35"
     };
   }
+
+  private generarEstructuraSillas(capacidadTotal: number) {
+    const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const sillasGeneradas = [];
+
+    let fila = 1;
+    let letraIndex = 0;
+
+    for (let i = 0; i < capacidadTotal; i++) {
+      const numeroSilla = `${fila}${letras[letraIndex]}`;
+      
+      // Ejemplo: Las primeras 2 filas (12 sillas) son de clase 'Primera', el resto 'Economica'
+      const clase = fila <= 2 ? 'Primera' : 'Economica';
+
+      sillasGeneradas.push({
+        numero_silla: numeroSilla,
+        clase: clase,
+        estado: 'Disponible',
+      });
+
+      letraIndex++;
+      // Cuando llegamos a la letra 'F', pasamos a la siguiente fila
+      if (letraIndex >= letras.length) {
+        letraIndex = 0;
+        fila++;
+      }
+    }
+
+    return sillasGeneradas;
+  }
+
+
+
 }

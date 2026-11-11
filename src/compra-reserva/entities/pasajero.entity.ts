@@ -33,7 +33,7 @@ export class Pasajero {
     @Column()
     telefono_contacto: Number
 
-    @Column({ type: 'number', nullable: true })
+    @Column({ type: 'int', nullable: true })
     id_silla: Number | null
 
     @Column()

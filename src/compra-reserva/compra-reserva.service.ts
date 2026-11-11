@@ -1,9 +1,10 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { CreateCompraReservaDto } from './dto/create-compra-reserva.dto';
 import { UpdateCompraReservaDto } from './dto/update-compra-reserva.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { CompraReserva } from './entities/compra-reserva.entity';
+import { Silla } from '../vuelos/entities/sillas.entity';
 
 @Injectable()
 export class CompraReservaService {
@@ -19,7 +20,7 @@ export class CompraReservaService {
 
   async create(createCompraReservaDto: CreateCompraReservaDto) {
     const reservaExistente = await this.compraReservaRepository.findOne({
-      where: { id_vuelo: createCompraReservaDto.idVuelo }
+      where: { id_vuelo: createCompraReservaDto.idVuelo, id_usuario: createCompraReservaDto.idUsuario }
     });
 
     if (reservaExistente) {
@@ -32,6 +33,40 @@ export class CompraReservaService {
     await queryRunner.startTransaction();
 
     try {
+      const cantidadPasajeros = createCompraReservaDto.pasajeros.length;
+
+      // 2. Buscar todas las sillas DISPONIBLES de este vuelo
+      const sillasDisponibles = await queryRunner.manager.find(Silla, {
+        where: {
+          id_vuelo: createCompraReservaDto.idVuelo,
+          estado: 'Disponible',
+        },
+      });
+
+      // 3. Validar que existan suficientes sillas para la cantidad de pasajeros
+      if (sillasDisponibles.length < cantidadPasajeros) {
+        throw new BadRequestException(
+          `No hay suficientes sillas disponibles. Solicitadas: ${cantidadPasajeros}, Disponibles: ${sillasDisponibles.length}.`,
+        );
+      }
+
+      // 4. Seleccionar sillas ALEATORIAS
+      // Mezclamos el arreglo de sillas disponibles y tomamos exactamente la cantidad de pasajeros
+      const sillasAleatorias = sillasDisponibles
+        .sort(() => Math.random() - 0.5)
+        .slice(0, cantidadPasajeros);
+
+      // Obtener los IDs de las sillas seleccionadas al azar
+      const idsSillasAsignadas = sillasAleatorias.map((silla) => silla.id_silla);
+
+      // 5. Marcar esas sillas como 'Ocupada' en la base de datos
+      await queryRunner.manager.update(
+        Silla,
+        { id_silla: In(idsSillasAsignadas) },
+        { estado: 'Ocupada' },
+      );
+
+
       const nuevoReserva = queryRunner.manager.create(CompraReserva, {
         codigo_reserva: createCompraReservaDto.codigoReserva,
         id_usuario: createCompraReservaDto.idUsuario,
@@ -43,7 +78,7 @@ export class CompraReservaService {
         id_vuelo: createCompraReservaDto.idVuelo,
         fecha_pago: createCompraReservaDto.fechaPago ? createCompraReservaDto.fechaPago : null,
 
-        pasajeros: createCompraReservaDto.pasajeros.map(pasajeroDto => ({
+        pasajeros: createCompraReservaDto.pasajeros.map((pasajeroDto, index) => ({
           nombre: pasajeroDto.nombreCompleto,
           dni: pasajeroDto.documento,
           fecha_nacimiento: pasajeroDto.fechaNacimiento,
@@ -52,9 +87,9 @@ export class CompraReservaService {
           correo: pasajeroDto.email,
           nombre_contacto: pasajeroDto.nombreContacto,
           telefono_contacto: pasajeroDto.telefonoContacto,
-          id_silla: null,
+          id_silla: sillasAleatorias[index].id_silla, //silla asquerosa
           cambios_silla: 0,
-          checkin_realizado: false
+          checkin_realizado: false,
         }))
       })
       const reservaGuardada = await queryRunner.manager.save(nuevoReserva);
