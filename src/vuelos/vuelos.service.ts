@@ -244,8 +244,8 @@ export class VuelosService {
     for (let i = 0; i < capacidadTotal; i++) {
       const numeroSilla = `${fila}${letras[letraIndex]}`;
       
-      // Ejemplo: Las primeras 2 filas (12 sillas) son de clase 'Primera', el resto 'Economica'
-      const clase = fila <= 2 ? 'Primera' : 'Economica';
+      // Ejemplo: Las primeras 2 filas (12 sillas) son de clase 'Primera', el resto 'Económica'
+      const clase = fila <= 2 ? 'Primera' : 'Económica';
 
       sillasGeneradas.push({
         numero_silla: numeroSilla,

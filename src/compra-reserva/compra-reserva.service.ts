@@ -1,12 +1,12 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateCompraReservaDto } from './dto/create-compra-reserva.dto';
-import { UpdateCompraReservaDto } from './dto/update-compra-reserva.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { CompraReserva } from './entities/compra-reserva.entity';
 import { Silla } from '../vuelos/entities/sillas.entity';
 import { Historial } from '../billetera/entities/historial.entity';
 import { Billetera } from '../billetera/entities/billetera.entity';
+import { QueryRunner } from 'typeorm/query-runner/QueryRunner';
 
 @Injectable()
 export class CompraReservaService {
@@ -24,26 +24,57 @@ export class CompraReservaService {
 
 
   async create(createCompraReservaDto: CreateCompraReservaDto) {
-    const reservaExistente = await this.compraReservaRepository.findOne({
-      where: { id_vuelo: createCompraReservaDto.idVuelo, id_usuario: createCompraReservaDto.idUsuario },
-    });
-
-
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
+      // 1. Buscar dentro de la transacción si el usuario ya tiene un registro en este vuelo
+      const reservaExistente = await queryRunner.manager.findOne(CompraReserva, {
+        where: {
+          id_vuelo: createCompraReservaDto.idVuelo,
+          id_usuario: createCompraReservaDto.idUsuario,
+        },
+      });
 
-      if (reservaExistente?.estado === 'Pagada' || (reservaExistente?.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente') ) {
-        throw new ConflictException(`Este usuario ya tiene una reserva o compra para este vuelo. reserva existente: ${reservaExistente.estado}, reserva nueva: ${createCompraReservaDto.estado}`);
+      // 🛑 CASO A: YA EXISTE UNA RESERVA/COMPRA
+      if (reservaExistente) {
+        // Bloquear si ya está 'Pagada' O si intenta crear otra reserva estando en 'Pendiente'
+        if (
+          reservaExistente.estado === 'Pagada' ||
+          (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente')
+        ) {
+          throw new ConflictException(
+            `Este usuario ya tiene una reserva o compra para este vuelo. Reserva existente: ${reservaExistente.estado}, Reserva nueva: ${createCompraReservaDto.estado}`
+          );
+        }
+
+        // PASAR DE 'Pendiente' A 'Pagada' (Solo actualiza estado y cobra, NO toca sillas)
+        if (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pagada') {
+          reservaExistente.estado = 'Pagada';
+          reservaExistente.fecha_pago = createCompraReservaDto.fechaPago ?? new Date();
+          reservaExistente.metodo_pago = createCompraReservaDto.metodoPago;
+          reservaExistente.monto_total = createCompraReservaDto.montoTotal;
+
+          const reservaActualizada = await queryRunner.manager.save(reservaExistente);
+
+          // Descontar del saldo de la billetera
+          await this.procesarPagoBilletera(queryRunner, reservaActualizada);
+
+          await queryRunner.commitTransaction();
+
+          return {
+            message: 'Reserva pagada exitosamente',
+            vuelo: this.mapReserva(reservaActualizada),
+          };
+        }
       }
 
-
+      // 🟢 CASO B: NO EXISTE RESERVA (Creación desde cero)
       const cantidadPasajeros = createCompraReservaDto.pasajeros.length;
 
-      // 2. Buscar todas las sillas DISPONIBLES de este vuelo
+      // Buscar sillas disponibles
       const sillasDisponibles = await queryRunner.manager.find(Silla, {
         where: {
           id_vuelo: createCompraReservaDto.idVuelo,
@@ -51,40 +82,37 @@ export class CompraReservaService {
         },
       });
 
-      // 3. Validar que existan suficientes sillas para la cantidad de pasajeros
       if (sillasDisponibles.length < cantidadPasajeros) {
         throw new BadRequestException(
           `No hay suficientes sillas disponibles. Solicitadas: ${cantidadPasajeros}, Disponibles: ${sillasDisponibles.length}.`,
         );
       }
 
-      // 4. Seleccionar sillas ALEATORIAS
-      // Mezclamos el arreglo de sillas disponibles y tomamos exactamente la cantidad de pasajeros
+      // Seleccionar sillas aleatorias
       const sillasAleatorias = sillasDisponibles
         .sort(() => Math.random() - 0.5)
         .slice(0, cantidadPasajeros);
 
-      // Obtener los IDs de las sillas seleccionadas al azar
       const idsSillasAsignadas = sillasAleatorias.map((silla) => silla.id_silla);
 
-      // 5. Marcar esas sillas como 'Ocupada' en la base de datos
+      // Marcar sillas como 'Reservado' (Usar 'Reservado' según el CHECK de la base de datos)
       await queryRunner.manager.update(
         Silla,
         { id_silla: In(idsSillasAsignadas) },
-        { estado: 'Ocupada' },
+        { estado: 'Reservado' },
       );
 
-
-      const nuevoReserva = queryRunner.manager.create(CompraReserva, {
+      // Crear la nueva entidad CompraReserva con sus pasajeros
+      const nuevaReserva = queryRunner.manager.create(CompraReserva, {
         codigo_reserva: createCompraReservaDto.codigoReserva,
         id_usuario: createCompraReservaDto.idUsuario,
         monto_total: createCompraReservaDto.montoTotal,
         estado: createCompraReservaDto.estado,
         metodo_pago: createCompraReservaDto.metodoPago,
         fecha_reserva: createCompraReservaDto.fechaReserva,
-        fecha_limite_pago: createCompraReservaDto.fechaLimitePago ? createCompraReservaDto.fechaLimitePago : null,
+        fecha_limite_pago: createCompraReservaDto.fechaLimitePago ?? null,
         id_vuelo: createCompraReservaDto.idVuelo,
-        fecha_pago: createCompraReservaDto.fechaPago ? createCompraReservaDto.fechaPago : null,
+        fecha_pago: createCompraReservaDto.fechaPago ?? (createCompraReservaDto.estado === 'Pagada' ? new Date() : null),
 
         pasajeros: createCompraReservaDto.pasajeros.map((pasajeroDto, index) => ({
           nombre: pasajeroDto.nombreCompleto,
@@ -95,55 +123,32 @@ export class CompraReservaService {
           correo: pasajeroDto.email,
           nombre_contacto: pasajeroDto.nombreContacto,
           telefono_contacto: pasajeroDto.telefonoContacto,
-          id_silla: sillasAleatorias[index].id_silla, //silla asquerosa
+          id_silla: sillasAleatorias[index].id_silla,
           cambios_silla: 0,
           checkin_realizado: false,
-        }))
-      })
-      const reservaGuardada = await queryRunner.manager.save(nuevoReserva);
+        })),
+      });
+
+      const reservaGuardada = await queryRunner.manager.save(nuevaReserva);
+
+      // Si la compra directa se crea inmediatamente como 'Pagada'
       if (reservaGuardada.estado === 'Pagada') {
-        const billetera = await queryRunner.manager.findOne(Billetera, {
-          where: { id_usuario: reservaGuardada.id_usuario },
-          lock: { mode: 'pessimistic_write' },
-        });
-
-        if (!billetera) {
-          throw new NotFoundException('No se encontró la billetera del usuario que realiza la compra.');
-        }
-
-        if (billetera.saldo < reservaGuardada.monto_total) {
-          throw new BadRequestException('Saldo insuficiente para realizar la compra.');
-        }
-
-        billetera.saldo -= reservaGuardada.monto_total;
-        await queryRunner.manager.save(billetera);
-
-        const historial = this.historialRepository.create({
-          info_historial: `Compra de la reserva ${reservaGuardada.codigo_reserva} por ${reservaGuardada.monto_total}. Saldo restante: ${billetera.saldo}`,
-          fecha_transaccion: new Date(),
-          id_billetera: billetera.id_billetera,
-          monto: -reservaGuardada.monto_total,
-        });
-        await queryRunner.manager.save(historial);
+        await this.procesarPagoBilletera(queryRunner, reservaGuardada);
       }
-
 
       await queryRunner.commitTransaction();
 
       return {
-        message: 'reserva creada exitosamente',
-        vuelo: this.mapReserva(reservaGuardada)
-      }
- 
+        message: 'Reserva creada exitosamente',
+        vuelo: this.mapReserva(reservaGuardada),
+      };
+
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
-    }
-
-    finally{
+    } finally {
       await queryRunner.release();
     }
-
   }
 
   async findOne(id: number) {
@@ -177,4 +182,34 @@ export class CompraReservaService {
       montoTotal: reserva.monto_total,
     };
   }
+
+  // Método auxiliar privado para no repetir el código del cobro de la billetera
+  private async procesarPagoBilletera(queryRunner: QueryRunner, reserva: CompraReserva) {
+    const billetera = await queryRunner.manager.findOne(Billetera, {
+      where: { id_usuario: reserva.id_usuario },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!billetera) {
+      throw new NotFoundException('No se encontró la billetera del usuario que realiza la compra.');
+    }
+
+    if (billetera.saldo < reserva.monto_total) {
+      throw new BadRequestException('Saldo insuficiente para realizar la compra.');
+    }
+
+    billetera.saldo -= reserva.monto_total;
+    await queryRunner.manager.save(billetera);
+
+    const historial = this.historialRepository.create({
+      info_historial: `Compra de la reserva ${reserva.codigo_reserva} por ${reserva.monto_total}. Saldo restante: ${billetera.saldo}`,
+      fecha_transaccion: new Date(),
+      id_billetera: billetera.id_billetera,
+      monto: -reserva.monto_total,
+    });
+
+    await queryRunner.manager.save(historial);
+  }
+
+
 }
