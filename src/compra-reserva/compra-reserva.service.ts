@@ -40,7 +40,7 @@ export class CompraReservaService {
 
       // 🛑 CASO A: YA EXISTE UNA RESERVA/COMPRA
       if (reservaExistente) {
-        // Bloquear si ya está 'Pagada' O si intenta crear otra reserva estando en 'Pendiente'
+        // Bloquear si ya está 'Pagado' O si intenta crear otra reserva estando en 'Pendiente'
         if (
           reservaExistente.estado === 'Pagado' ||
           (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente')
@@ -50,8 +50,8 @@ export class CompraReservaService {
           );
         }
 
-        // PASAR DE 'Pendiente' A 'Pagada' (Solo actualiza estado y cobra, NO toca sillas)
-        if (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pagada') {
+        // PASAR DE 'Pendiente' A 'Pagado' (Solo actualiza estado y cobra, NO toca sillas)
+        if (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pagado') {
           reservaExistente.estado = 'Pagado';
           reservaExistente.fecha_pago = createCompraReservaDto.fechaPago ?? new Date();
           reservaExistente.metodo_pago = createCompraReservaDto.metodoPago;
@@ -131,7 +131,7 @@ export class CompraReservaService {
 
       const reservaGuardada = await queryRunner.manager.save(nuevaReserva);
 
-      // Si la compra directa se crea inmediatamente como 'Pagada'
+      // Si la compra directa se crea inmediatamente como 'Pagado'
       if (reservaGuardada.estado === 'Pagado') {
         await this.procesarPagoBilletera(queryRunner, reservaGuardada);
       }
