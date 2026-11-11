@@ -25,12 +25,9 @@ export class CompraReservaService {
 
   async create(createCompraReservaDto: CreateCompraReservaDto) {
     const reservaExistente = await this.compraReservaRepository.findOne({
-      where: { id_vuelo: createCompraReservaDto.idVuelo, id_usuario: createCompraReservaDto.idUsuario }
+      where: { id_vuelo: createCompraReservaDto.idVuelo, id_usuario: createCompraReservaDto.idUsuario },
     });
 
-    if (reservaExistente) {
-      throw new ConflictException('Este usuario ya tiene una reserva para este vuelo.');
-    }
 
     const queryRunner = this.dataSource.createQueryRunner();
 
@@ -38,6 +35,12 @@ export class CompraReservaService {
     await queryRunner.startTransaction();
 
     try {
+
+      if (reservaExistente?.estado === 'Pagada' || (reservaExistente?.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente') ) {
+        throw new ConflictException('Este usuario ya tiene una reserva o compra para este vuelo.');
+      }
+
+
       const cantidadPasajeros = createCompraReservaDto.pasajeros.length;
 
       // 2. Buscar todas las sillas DISPONIBLES de este vuelo
