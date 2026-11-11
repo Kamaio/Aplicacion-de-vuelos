@@ -42,7 +42,7 @@ export class CompraReservaService {
       if (reservaExistente) {
         // Bloquear si ya está 'Pagada' O si intenta crear otra reserva estando en 'Pendiente'
         if (
-          reservaExistente.estado === 'Pagada' ||
+          reservaExistente.estado === 'Pagado' ||
           (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente')
         ) {
           throw new ConflictException(
@@ -52,7 +52,7 @@ export class CompraReservaService {
 
         // PASAR DE 'Pendiente' A 'Pagada' (Solo actualiza estado y cobra, NO toca sillas)
         if (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pagada') {
-          reservaExistente.estado = 'Pagada';
+          reservaExistente.estado = 'Pagado';
           reservaExistente.fecha_pago = createCompraReservaDto.fechaPago ?? new Date();
           reservaExistente.metodo_pago = createCompraReservaDto.metodoPago;
           reservaExistente.monto_total = createCompraReservaDto.montoTotal;
@@ -112,7 +112,7 @@ export class CompraReservaService {
         fecha_reserva: createCompraReservaDto.fechaReserva,
         fecha_limite_pago: createCompraReservaDto.fechaLimitePago ?? null,
         id_vuelo: createCompraReservaDto.idVuelo,
-        fecha_pago: createCompraReservaDto.fechaPago ?? (createCompraReservaDto.estado === 'Pagada' ? new Date() : null),
+        fecha_pago: createCompraReservaDto.fechaPago ?? (createCompraReservaDto.estado === 'Pagado' ? new Date() : null),
 
         pasajeros: createCompraReservaDto.pasajeros.map((pasajeroDto, index) => ({
           nombre: pasajeroDto.nombreCompleto,
@@ -132,7 +132,7 @@ export class CompraReservaService {
       const reservaGuardada = await queryRunner.manager.save(nuevaReserva);
 
       // Si la compra directa se crea inmediatamente como 'Pagada'
-      if (reservaGuardada.estado === 'Pagada') {
+      if (reservaGuardada.estado === 'Pagado') {
         await this.procesarPagoBilletera(queryRunner, reservaGuardada);
       }
 
