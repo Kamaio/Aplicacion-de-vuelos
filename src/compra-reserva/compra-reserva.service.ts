@@ -1,10 +1,12 @@
-import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateCompraReservaDto } from './dto/create-compra-reserva.dto';
 import { UpdateCompraReservaDto } from './dto/update-compra-reserva.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { CompraReserva } from './entities/compra-reserva.entity';
 import { Silla } from '../vuelos/entities/sillas.entity';
+import { Historial } from '../billetera/entities/historial.entity';
+import { Billetera } from '../billetera/entities/billetera.entity';
 
 @Injectable()
 export class CompraReservaService {
@@ -12,6 +14,9 @@ export class CompraReservaService {
   constructor(
     @InjectRepository(CompraReserva)
     private readonly compraReservaRepository: Repository<CompraReserva>,
+
+    @InjectRepository(Historial)
+    private readonly historialRepository: Repository<Historial>,
     
     private readonly dataSource: DataSource
   ) {}
@@ -93,6 +98,32 @@ export class CompraReservaService {
         }))
       })
       const reservaGuardada = await queryRunner.manager.save(nuevoReserva);
+      if (reservaGuardada.estado === 'Pagada') {
+        const billetera = await queryRunner.manager.findOne(Billetera, {
+          where: { id_usuario: reservaGuardada.id_usuario },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!billetera) {
+          throw new NotFoundException('No se encontró la billetera del usuario que realiza la compra.');
+        }
+
+        if (billetera.saldo < reservaGuardada.monto_total) {
+          throw new BadRequestException('Saldo insuficiente para realizar la compra.');
+        }
+
+        billetera.saldo -= reservaGuardada.monto_total;
+        await queryRunner.manager.save(billetera);
+
+        const historial = this.historialRepository.create({
+          info_historial: `Compra de la reserva ${reservaGuardada.codigo_reserva} por ${reservaGuardada.monto_total}. Saldo restante: ${billetera.saldo}`,
+          fecha_transaccion: new Date(),
+          id_billetera: billetera.id_billetera,
+          monto: -reservaGuardada.monto_total,
+        });
+        await queryRunner.manager.save(historial);
+      }
+
 
       await queryRunner.commitTransaction();
 

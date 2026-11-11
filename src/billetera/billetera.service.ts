@@ -149,7 +149,8 @@ export class BilleteraService {
       id_historial: historial.id_historial,
       fecha_transaccion: historial.fecha_transaccion,
       info_historial: historial.info_historial,
-      id_billetera: historial.id_billetera
+      id_billetera: historial.id_billetera,
+      monto: historial.monto
     };
   }
 }
