@@ -114,11 +114,15 @@ export class CompraReservaService {
 
   async findOne(id: number) {
     const reservas = await this.compraReservaRepository.find({
-      where: { id_usuario: id }
+      where: { id_usuario: id },
+      relations: {
+        vuelo: true,
+        pasajeros: true,
+      },
     });
 
     return reservas.map(reserva => this.mapReserva(reserva));
-  }
+}
 
   async remove(id: number) {
     await this.compraReservaRepository.delete(id);

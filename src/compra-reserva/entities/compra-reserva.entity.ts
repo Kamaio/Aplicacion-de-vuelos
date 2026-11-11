@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn, OneToMany, JoinColumn, ManyToOne } from "typeorm";
 import { Pasajero } from "./pasajero.entity";
+import { Vuelo } from "../../vuelos/entities/vuelo.entity";
 
 @Entity('compra_reserva')
 export class CompraReserva {
@@ -35,4 +36,8 @@ export class CompraReserva {
 
     @OneToMany(() => Pasajero, (pasajero) => pasajero.compraReserva, { cascade: true })
     pasajeros: Pasajero[];
+
+    @ManyToOne(() => Vuelo)
+    @JoinColumn({ name: 'id_vuelo' })
+    vuelo: Vuelo;
 }
