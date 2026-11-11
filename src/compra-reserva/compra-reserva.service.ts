@@ -37,7 +37,7 @@ export class CompraReservaService {
     try {
 
       if (reservaExistente?.estado === 'Pagada' || (reservaExistente?.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente') ) {
-        throw new ConflictException('Este usuario ya tiene una reserva o compra para este vuelo.');
+        throw new ConflictException(`Este usuario ya tiene una reserva o compra para este vuelo. reserva existente: ${reservaExistente.estado}, reserva nueva: ${createCompraReservaDto.estado}`);
       }
 
 
