@@ -1,24 +1,22 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateCompraReservaDto } from './dto/create-compra-reserva.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, QueryRunner } from 'typeorm';
 import { CompraReserva } from './entities/compra-reserva.entity';
 import { Silla } from '../vuelos/entities/sillas.entity';
 import { Historial } from '../billetera/entities/historial.entity';
 import { Billetera } from '../billetera/entities/billetera.entity';
-import { QueryRunner } from 'typeorm/query-runner/QueryRunner';
 
 @Injectable()
 export class CompraReservaService {
-
   constructor(
     @InjectRepository(CompraReserva)
     private readonly compraReservaRepository: Repository<CompraReserva>,
 
     @InjectRepository(Historial)
     private readonly historialRepository: Repository<Historial>,
-    
-    private readonly dataSource: DataSource
+
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createCompraReservaDto: CreateCompraReservaDto) {
@@ -40,21 +38,27 @@ export class CompraReservaService {
       if (reservaExistente) {
         if (
           reservaExistente.estado === 'Pagado' ||
-          (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente')
+          (reservaExistente.estado === 'Pendiente' &&
+            createCompraReservaDto.estado === 'Pendiente')
         ) {
           throw new ConflictException(
-            `Este usuario ya tiene una reserva o compra para este vuelo. Reserva existente: ${reservaExistente.estado}, Reserva nueva: ${createCompraReservaDto.estado}`
+            `Este usuario ya tiene una reserva o compra para este vuelo. Reserva existente: ${reservaExistente.estado}, Reserva nueva: ${createCompraReservaDto.estado}`,
           );
         }
 
         // PASAR DE 'Pendiente' A 'Pagado'
-        if (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pagado') {
+        if (
+          reservaExistente.estado === 'Pendiente' &&
+          createCompraReservaDto.estado === 'Pagado'
+        ) {
           reservaExistente.estado = 'Pagado';
-          reservaExistente.fecha_pago = createCompraReservaDto.fechaPago ?? new Date();
+          reservaExistente.fecha_pago =
+            createCompraReservaDto.fechaPago ?? new Date();
           reservaExistente.metodo_pago = createCompraReservaDto.metodoPago;
           reservaExistente.monto_total = createCompraReservaDto.montoTotal;
 
-          const reservaActualizada = await queryRunner.manager.save(reservaExistente);
+          const reservaActualizada =
+            await queryRunner.manager.save(reservaExistente);
 
           await this.procesarPagoBilletera(queryRunner, reservaActualizada);
 
@@ -70,28 +74,54 @@ export class CompraReservaService {
       // 🟢 CASO B: NO EXISTE RESERVA (Creación desde cero)
       const cantidadPasajeros = createCompraReservaDto.pasajeros.length;
 
-      // Buscar sillas disponibles
-      const sillasDisponibles = await queryRunner.manager.find(Silla, {
+      // Saber si el vuelo es Internacional (250 sillas -> límite 50) o Nacional (150 sillas -> límite 25)
+      const totalSillasVuelo = await queryRunner.manager.count(Silla, {
+        where: { id_vuelo: createCompraReservaDto.idVuelo },
+      });
+      const limitePrimeraClase = totalSillasVuelo > 150 ? 50 : 25;
+
+      // Verificar qué clase pidió el usuario ('PRIMERA_CLASE' vs 'ECONOMICA')
+      const esPrimeraClase = createCompraReservaDto.clase
+        ?.toUpperCase()
+        .includes('PRIMERA');
+
+      // Buscar todas las sillas DISPONIBLES de este vuelo
+      const todasLasDisponibles = await queryRunner.manager.find(Silla, {
         where: {
           id_vuelo: createCompraReservaDto.idVuelo,
           estado: 'Disponible',
         },
       });
 
+      // Filtrar SOLO las sillas que pertenecen al rango numérico de la clase solicitada
+      const sillasDisponibles = todasLasDisponibles.filter((silla) => {
+        const numeroSilla = this.obtenerNumeroCorrelativoSilla(
+          silla.numero_silla,
+        );
+        if (esPrimeraClase) {
+          // Del 1 al 25 (Nacional) o del 1 al 50 (Internacional)
+          return numeroSilla >= 1 && numeroSilla <= limitePrimeraClase;
+        }
+        // Del 26 al 150 (Nacional) o del 51 al 250 (Internacional)
+        return numeroSilla > limitePrimeraClase;
+      });
+
+      // Validar que existan suficientes sillas disponibles en esa clase
       if (sillasDisponibles.length < cantidadPasajeros) {
+        const nombreClase = esPrimeraClase ? 'Primera Clase' : 'Económica';
         throw new BadRequestException(
-          `No hay suficientes sillas disponibles. Solicitadas: ${cantidadPasajeros}, Disponibles: ${sillasDisponibles.length}.`,
+          `No hay suficientes sillas disponibles en ${nombreClase}. Solicitadas: ${cantidadPasajeros}, Disponibles: ${sillasDisponibles.length}.`,
         );
       }
 
-      // Seleccionar sillas aleatorias
+      // Seleccionar sillas aleatorias dentro de la clase correspondiente
       const sillasAleatorias = sillasDisponibles
         .sort(() => Math.random() - 0.5)
         .slice(0, cantidadPasajeros);
 
       const idsSillasAsignadas = sillasAleatorias.map((silla) => silla.id_silla);
 
-      // Marcar sillas como 'Reservado'
+      // Marcar esas sillas como 'Reservado' en la base de datos
       await queryRunner.manager.update(
         Silla,
         { id_silla: In(idsSillasAsignadas) },
@@ -108,7 +138,9 @@ export class CompraReservaService {
         fecha_reserva: createCompraReservaDto.fechaReserva,
         fecha_limite_pago: createCompraReservaDto.fechaLimitePago ?? null,
         id_vuelo: createCompraReservaDto.idVuelo,
-        fecha_pago: createCompraReservaDto.fechaPago ?? (createCompraReservaDto.estado === 'Pagado' ? new Date() : null),
+        fecha_pago:
+          createCompraReservaDto.fechaPago ??
+          (createCompraReservaDto.estado === 'Pagado' ? new Date() : null),
 
         pasajeros: createCompraReservaDto.pasajeros.map((pasajeroDto, index) => ({
           nombre: pasajeroDto.nombreCompleto,
@@ -137,7 +169,6 @@ export class CompraReservaService {
         message: 'Reserva creada exitosamente',
         vuelo: this.mapReserva(reservaGuardada),
       };
-
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -146,7 +177,24 @@ export class CompraReservaService {
     }
   }
 
-  // 🟢 CAMBIO 1: Consultar también las sillas reales de la BD para cruzar cada pasajero con su código de silla exacto
+  /**
+   * Convierte códigos como '1A' -> 1, '5A' -> 25, '5B' -> 26, '9B' -> 50
+   * (6 columnas por fila: A, B, C, D, E, F)
+   */
+  private obtenerNumeroCorrelativoSilla(codigoSilla: string): number {
+    const limpio = String(codigoSilla).trim().toUpperCase();
+    const match = limpio.match(/^(\d+)([A-F])$/);
+
+    if (match) {
+      const fila = parseInt(match[1], 10);
+      const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const posicionLetra = letras.indexOf(match[2]) + 1;
+      return (fila - 1) * 6 + posicionLetra;
+    }
+
+    return parseInt(limpio, 10) || 0;
+  }
+
   async findOne(id: number) {
     const reservas = await this.compraReservaRepository.find({
       where: { id_usuario: id },
@@ -156,7 +204,6 @@ export class CompraReservaService {
       },
     });
 
-    // Extraer todos los id_silla asignados a los pasajeros de estas reservas
     const idsSillas = reservas
       .flatMap((r) => r.pasajeros || [])
       .map((p: any) => p.id_silla)
@@ -164,9 +211,11 @@ export class CompraReservaService {
 
     const mapaSillas = new Map<number, Silla>();
     if (idsSillas.length > 0) {
-      const sillasEncontradas = await this.dataSource.getRepository(Silla).find({
-        where: { id_silla: In(idsSillas) },
-      });
+      const sillasEncontradas = await this.dataSource
+        .getRepository(Silla)
+        .find({
+          where: { id_silla: In(idsSillas) },
+        });
       sillasEncontradas.forEach((s) => mapaSillas.set(s.id_silla, s));
     }
 
@@ -178,7 +227,6 @@ export class CompraReservaService {
     return { message: `Reserva con ID ${id} eliminada permanentemente` };
   }
 
-  // 🟢 CAMBIO 2: Incluir cantidadPasajeros, pasajeros (con su silla real) y vuelo en la respuesta
   private mapReserva(reserva: CompraReserva, mapaSillas?: Map<number, Silla>) {
     const pasajerosMapeados = (reserva.pasajeros || []).map((p: any) => {
       const sillaObj = mapaSillas?.get(p.id_silla);
@@ -214,24 +262,31 @@ export class CompraReservaService {
       idVuelo: reserva.id_vuelo,
       metodoPago: reserva.metodo_pago,
       montoTotal: reserva.monto_total,
-      cantidadPasajeros: pasajerosMapeados.length || 1, // 👈 Devuelve el número real de pasajeros
-      pasajeros: pasajerosMapeados,                     // 👈 Devuelve los datos y silla real de cada uno
-      vuelo: reserva.vuelo || null,                     // 👈 Devuelve el detalle real del vuelo
+      cantidadPasajeros: pasajerosMapeados.length || 1,
+      pasajeros: pasajerosMapeados,
+      vuelo: reserva.vuelo || null,
     };
   }
 
-  private async procesarPagoBilletera(queryRunner: QueryRunner, reserva: CompraReserva) {
+  private async procesarPagoBilletera(
+    queryRunner: QueryRunner,
+    reserva: CompraReserva,
+  ) {
     const billetera = await queryRunner.manager.findOne(Billetera, {
       where: { id_usuario: reserva.id_usuario },
       lock: { mode: 'pessimistic_write' },
     });
 
     if (!billetera) {
-      throw new NotFoundException('No se encontró la billetera del usuario que realiza la compra.');
+      throw new NotFoundException(
+        'No se encontró la billetera del usuario que realiza la compra.',
+      );
     }
 
     if (billetera.saldo < reserva.monto_total) {
-      throw new BadRequestException('Saldo insuficiente para realizar la compra.');
+      throw new BadRequestException(
+        'Saldo insuficiente para realizar la compra.',
+      );
     }
 
     billetera.saldo -= reserva.monto_total;
