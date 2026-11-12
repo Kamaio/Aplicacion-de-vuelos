@@ -21,8 +21,6 @@ export class CompraReservaService {
     private readonly dataSource: DataSource
   ) {}
 
-
-
   async create(createCompraReservaDto: CreateCompraReservaDto) {
     const queryRunner = this.dataSource.createQueryRunner();
 
@@ -40,7 +38,6 @@ export class CompraReservaService {
 
       // 🛑 CASO A: YA EXISTE UNA RESERVA/COMPRA
       if (reservaExistente) {
-        // Bloquear si ya está 'Pagado' O si intenta crear otra reserva estando en 'Pendiente'
         if (
           reservaExistente.estado === 'Pagado' ||
           (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pendiente')
@@ -50,7 +47,7 @@ export class CompraReservaService {
           );
         }
 
-        // PASAR DE 'Pendiente' A 'Pagado' (Solo actualiza estado y cobra, NO toca sillas)
+        // PASAR DE 'Pendiente' A 'Pagado'
         if (reservaExistente.estado === 'Pendiente' && createCompraReservaDto.estado === 'Pagado') {
           reservaExistente.estado = 'Pagado';
           reservaExistente.fecha_pago = createCompraReservaDto.fechaPago ?? new Date();
@@ -59,7 +56,6 @@ export class CompraReservaService {
 
           const reservaActualizada = await queryRunner.manager.save(reservaExistente);
 
-          // Descontar del saldo de la billetera
           await this.procesarPagoBilletera(queryRunner, reservaActualizada);
 
           await queryRunner.commitTransaction();
@@ -95,7 +91,7 @@ export class CompraReservaService {
 
       const idsSillasAsignadas = sillasAleatorias.map((silla) => silla.id_silla);
 
-      // Marcar sillas como 'Reservado' (Usar 'Reservado' según el CHECK de la base de datos)
+      // Marcar sillas como 'Reservado'
       await queryRunner.manager.update(
         Silla,
         { id_silla: In(idsSillasAsignadas) },
@@ -131,7 +127,6 @@ export class CompraReservaService {
 
       const reservaGuardada = await queryRunner.manager.save(nuevaReserva);
 
-      // Si la compra directa se crea inmediatamente como 'Pagado'
       if (reservaGuardada.estado === 'Pagado') {
         await this.procesarPagoBilletera(queryRunner, reservaGuardada);
       }
@@ -151,6 +146,7 @@ export class CompraReservaService {
     }
   }
 
+  // 🟢 CAMBIO 1: Consultar también las sillas reales de la BD para cruzar cada pasajero con su código de silla exacto
   async findOne(id: number) {
     const reservas = await this.compraReservaRepository.find({
       where: { id_usuario: id },
@@ -160,15 +156,53 @@ export class CompraReservaService {
       },
     });
 
-    return reservas.map(reserva => this.mapReserva(reserva));
-}
+    // Extraer todos los id_silla asignados a los pasajeros de estas reservas
+    const idsSillas = reservas
+      .flatMap((r) => r.pasajeros || [])
+      .map((p: any) => p.id_silla)
+      .filter((idSilla) => Boolean(idSilla));
+
+    const mapaSillas = new Map<number, Silla>();
+    if (idsSillas.length > 0) {
+      const sillasEncontradas = await this.dataSource.getRepository(Silla).find({
+        where: { id_silla: In(idsSillas) },
+      });
+      sillasEncontradas.forEach((s) => mapaSillas.set(s.id_silla, s));
+    }
+
+    return reservas.map((reserva) => this.mapReserva(reserva, mapaSillas));
+  }
 
   async remove(id: number) {
     await this.compraReservaRepository.delete(id);
     return { message: `Reserva con ID ${id} eliminada permanentemente` };
   }
 
-  private mapReserva(reserva: CompraReserva) {
+  // 🟢 CAMBIO 2: Incluir cantidadPasajeros, pasajeros (con su silla real) y vuelo en la respuesta
+  private mapReserva(reserva: CompraReserva, mapaSillas?: Map<number, Silla>) {
+    const pasajerosMapeados = (reserva.pasajeros || []).map((p: any) => {
+      const sillaObj = mapaSillas?.get(p.id_silla);
+      const codigoSilla =
+        (sillaObj as any)?.numero_silla ||
+        (sillaObj as any)?.numeroSilla ||
+        (sillaObj as any)?.codigo ||
+        (p.id_silla ? `Silla #${p.id_silla}` : '');
+
+      return {
+        idPasajero: p.id_pasajero,
+        nombreCompleto: p.nombre,
+        documento: p.dni,
+        fechaNacimiento: p.fecha_nacimiento,
+        genero: p.genero,
+        telefono: p.telefono,
+        email: p.correo,
+        idSilla: p.id_silla,
+        sillaActual: codigoSilla,
+        cambiosSilla: p.cambios_silla,
+        checkinRealizado: p.checkin_realizado,
+      };
+    });
+
     return {
       idReserva: reserva.id_compra,
       codigoReserva: reserva.codigo_reserva,
@@ -180,10 +214,12 @@ export class CompraReservaService {
       idVuelo: reserva.id_vuelo,
       metodoPago: reserva.metodo_pago,
       montoTotal: reserva.monto_total,
+      cantidadPasajeros: pasajerosMapeados.length || 1, // 👈 Devuelve el número real de pasajeros
+      pasajeros: pasajerosMapeados,                     // 👈 Devuelve los datos y silla real de cada uno
+      vuelo: reserva.vuelo || null,                     // 👈 Devuelve el detalle real del vuelo
     };
   }
 
-  // Método auxiliar privado para no repetir el código del cobro de la billetera
   private async procesarPagoBilletera(queryRunner: QueryRunner, reserva: CompraReserva) {
     const billetera = await queryRunner.manager.findOne(Billetera, {
       where: { id_usuario: reserva.id_usuario },
@@ -210,6 +246,4 @@ export class CompraReservaService {
 
     await queryRunner.manager.save(historial);
   }
-
-
 }
