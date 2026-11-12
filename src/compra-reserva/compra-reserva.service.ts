@@ -6,6 +6,7 @@ import { CompraReserva } from './entities/compra-reserva.entity';
 import { Silla } from '../vuelos/entities/sillas.entity';
 import { Historial } from '../billetera/entities/historial.entity';
 import { Billetera } from '../billetera/entities/billetera.entity';
+import { Pasajero } from './entities/pasajero.entity';
 
 @Injectable()
 export class CompraReservaService {
@@ -177,24 +178,6 @@ export class CompraReservaService {
     }
   }
 
-  /**
-   * Convierte códigos como '1A' -> 1, '5A' -> 25, '5B' -> 26, '9B' -> 50
-   * (6 columnas por fila: A, B, C, D, E, F)
-   */
-  private obtenerNumeroCorrelativoSilla(codigoSilla: string): number {
-    const limpio = String(codigoSilla).trim().toUpperCase();
-    const match = limpio.match(/^(\d+)([A-F])$/);
-
-    if (match) {
-      const fila = parseInt(match[1], 10);
-      const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
-      const posicionLetra = letras.indexOf(match[2]) + 1;
-      return (fila - 1) * 6 + posicionLetra;
-    }
-
-    return parseInt(limpio, 10) || 0;
-  }
-
   async findOne(id: number) {
     const reservas = await this.compraReservaRepository.find({
       where: { id_usuario: id },
@@ -225,6 +208,87 @@ export class CompraReservaService {
   async remove(id: number) {
     await this.compraReservaRepository.delete(id);
     return { message: `Reserva con ID ${id} eliminada permanentemente` };
+  }
+
+  async actualizarSillaReserva(idReserva: number, idPasajero: number, idNuevaSilla: number) {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Buscar al pasajero (importando la entidad Pasajero de tu módulo correspondiente)
+      const pasajero = await queryRunner.manager.findOne(Pasajero, {
+        where: { 
+          id_pasajero: idPasajero, 
+          compraReserva: { id_compra: idReserva } 
+        }
+      });
+
+      if (!pasajero) {
+        throw new NotFoundException('No se encontró el pasajero asociado a esta reserva.');
+      }
+
+      // 2. Validar que NO haya hecho Check-in
+      if (pasajero.checkin_realizado) {
+        throw new BadRequestException('No se puede cambiar la silla porque el pasajero ya realizó el check-in.');
+      }
+
+      // 3. Validar si ya utilizó su único cambio de silla
+      // Nota: Si en tu BD lo tienes como número (0 o 1), usa "pasajero.cambios_silla >= 1"
+      if (pasajero.cambios_silla === 1) {
+        throw new BadRequestException('El pasajero ya utilizó su único cambio de silla permitido.');
+      }
+
+      // 4. Verificar que la NUEVA silla exista y esté disponible
+      const nuevaSilla = await queryRunner.manager.findOne(Silla, {
+        where: { id_silla: idNuevaSilla },
+      });
+
+      if (!nuevaSilla) {
+        throw new NotFoundException('La nueva silla seleccionada no existe.');
+      }
+
+      if (nuevaSilla.estado !== 'Disponible') {
+        throw new BadRequestException('La silla seleccionada ya no está disponible.');
+      }
+
+      // 5. Liberar la silla ANTERIOR del pasajero
+      if (pasajero.id_silla) {
+        await queryRunner.manager.update(
+          Silla, 
+          { id_silla: pasajero.id_silla }, 
+          { estado: 'Disponible' }
+        );
+      }
+
+      // 6. Ocupar la NUEVA silla
+      await queryRunner.manager.update(
+        Silla, 
+        { id_silla: idNuevaSilla }, 
+        { estado: 'Reservado' } // o 'Asignado', dependiendo de tu CHECK de BD
+      );
+
+      // 7. Actualizar los datos del pasajero
+      pasajero.id_silla = idNuevaSilla;
+      // Actualizamos el atributo a 1
+      pasajero.cambios_silla = 1; 
+
+      const pasajeroActualizado = await queryRunner.manager.save(pasajero);
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: 'Silla actualizada correctamente.',
+        pasajero: pasajeroActualizado
+      };
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private mapReserva(reserva: CompraReserva, mapaSillas?: Map<number, Silla>) {
@@ -300,5 +364,19 @@ export class CompraReservaService {
     });
 
     await queryRunner.manager.save(historial);
+  }
+
+  private obtenerNumeroCorrelativoSilla(codigoSilla: string): number {
+    const limpio = String(codigoSilla).trim().toUpperCase();
+    const match = limpio.match(/^(\d+)([A-F])$/);
+
+    if (match) {
+      const fila = parseInt(match[1], 10);
+      const letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const posicionLetra = letras.indexOf(match[2]) + 1;
+      return (fila - 1) * 6 + posicionLetra;
+    }
+
+    return parseInt(limpio, 10) || 0;
   }
 }
