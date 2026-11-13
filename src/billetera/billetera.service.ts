@@ -1,6 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateBilleteraDto } from './dto/create-billetera.dto';
-import { UpdateBilleteraDto } from './dto/update-billetera.dto';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateTarjetaDto } from './dto/create-tarjeta.dto';
 import { Billetera } from './entities/billetera.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -83,7 +81,11 @@ export class BilleteraService {
     });
 
     if (!billetera) {
-      throw new NotFoundException("Billetera con id de usuario ${id} no encontrada");
+      throw new NotFoundException("Billetera con id de usuario ${idUsuario} no encontrada");
+    }
+
+    if (updateBilleteraDto.monto > 9999999999 || updateBilleteraDto.monto+billetera.saldo > 9999999999) {
+      throw new BadRequestException("El monto a actualizar excede el límite permitido");
     }
     
     if (updateBilleteraDto.monto !== undefined) billetera.saldo += updateBilleteraDto.monto;
@@ -94,6 +96,7 @@ export class BilleteraService {
       id_billetera: billetera.id_billetera,
       monto: updateBilleteraDto.monto
     });
+    console.log(`se actualizo el saldo: ${updateBilleteraDto.monto}`);
 
     await this.billeteraRepository.save(billetera);
 
