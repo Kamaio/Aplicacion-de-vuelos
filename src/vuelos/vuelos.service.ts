@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateVueloDto } from './dto/create-vuelo.dto';
 import { UpdateVueloDto } from './dto/update-vuelo.dto';
 import { BusquedaParametrizadaDto } from './dto/busquedaParametrizada.dto';
@@ -6,6 +6,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Vuelo } from './entities/vuelo.entity';
 import { DataSource, Repository } from 'typeorm';
 import { Silla } from './entities/sillas.entity';
+import { CompraReserva } from '../compra-reserva/entities/compra-reserva.entity';
+import { Billetera } from '../billetera/entities/billetera.entity';
+import { Historial } from '../billetera/entities/historial.entity';
 
 @Injectable()
 export class VuelosService {
@@ -163,22 +166,92 @@ export class VuelosService {
   }
 
   async remove(id: number) {
-    const vuelo = await this.vueloRepository.findOne({ where: { id_vuelo: id } });
+    const queryRunner = this.dataSource.createQueryRunner();
+    
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!vuelo) {
-      throw new NotFoundException(`Vuelo con id ${id} no existe`);
+    try {
+      // 1. Buscar el vuelo
+      const vuelo = await queryRunner.manager.findOne(Vuelo, { 
+        where: { id_vuelo: id } 
+      });
+
+      if (!vuelo) {
+        throw new NotFoundException(`Vuelo con id ${id} no existe`);
+      }
+
+      // No se puede cancelar si ya se realizó
+      if (vuelo.estado === 'Realizado') {
+        throw new BadRequestException(`No se puede eliminar un vuelo que ya fue realizado`);
+      }
+
+      // 2. Buscar todas las reservas vinculadas a este vuelo (con sus pasajeros)
+      const reservas = await queryRunner.manager.find(CompraReserva, {
+        where: { id_vuelo: id },
+        relations: { pasajeros: true },
+      });
+
+      // 3. Procesar las reservas: Reembolsos
+      for (const reserva of reservas) {
+
+        // Si la reserva ya fue PAGADA, devolvemos el dinero a la billetera
+        if (reserva.estado === 'Pagado') {
+          const billetera = await queryRunner.manager.findOne(Billetera, {
+            where: { id_usuario: reserva.id_usuario },
+            lock: { mode: 'pessimistic_write' } // Bloquear para evitar condiciones de carrera
+          });
+
+          if (billetera) {
+            billetera.saldo += reserva.monto_total;
+            await queryRunner.manager.save(billetera);
+
+            // Registrar el reembolso en el historial
+            const historial = queryRunner.manager.create(Historial, {
+              info_historial: `Reembolso por cancelación de vuelo ${vuelo.codigo_vuelo} (Código Reserva: ${reserva.codigo_reserva}). Saldo actual: ${billetera.saldo}`,
+              fecha_transaccion: new Date(),
+              id_billetera: billetera.id_billetera,
+              monto: reserva.monto_total,
+            });
+            await queryRunner.manager.save(historial);
+          }
+        }
+      }
+
+      // 4. Extraer y eliminar físicamente a todos los pasajeros
+      const pasajerosTotales = reservas.flatMap((r) => r.pasajeros || []);
+      if (pasajerosTotales.length > 0) {
+        await queryRunner.manager.remove(pasajerosTotales);
+      }
+
+      // 5. Eliminar físicamente las reservas (tanto Pagadas como Pendientes)
+      if (reservas.length > 0) {
+        await queryRunner.manager.remove(reservas);
+      }
+
+      // 6. Eliminar físicamente todas las sillas del vuelo
+      await queryRunner.manager.delete(Silla, { id_vuelo: id });
+
+      // 7. Actualizar el estado del vuelo a 'Cancelado' y sus reservas a 0
+      vuelo.estado = 'Cancelado';
+      vuelo.reservas_total = 0;
+      await queryRunner.manager.save(vuelo);
+
+      // Confirmar todos los cambios
+      await queryRunner.commitTransaction();
+
+      return { 
+        message: `Vuelo ${vuelo.codigo_vuelo} cancelado. Reservas/Pasajeros eliminados, Sillas borradas y reembolsos aplicados.` 
+      };
+
+    } catch (error) {
+      // Si algo falla (ej. error de base de datos), revertimos todo para no descontar dinero por error
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      // Liberar el queryRunner
+      await queryRunner.release();
     }
-
-    const mapaConteos = await this.obtenerMapaConteoReservas();
-    const reservasReales = mapaConteos.get(vuelo.id_vuelo) ?? vuelo.reservas_total ?? 0;
-
-    if (reservasReales !== 0 || vuelo.estado === 'Realizado') {
-      throw new NotFoundException(`Imposible de eliminar, vuelo con ${reservasReales} reservas activas o ya realizado`);
-    }
-
-    vuelo.estado = 'Cancelado';
-    await this.vueloRepository.save(vuelo);
-    return { message: `Vuelo con id ${id} cancelado exitosamente` };
   }
 
   private async obtenerMapaConteoReservas() {

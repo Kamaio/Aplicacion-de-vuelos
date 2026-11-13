@@ -206,8 +206,108 @@ export class CompraReservaService {
   }
 
   async remove(id: number) {
-    await this.compraReservaRepository.delete(id);
-    return { message: `Reserva con ID ${id} eliminada permanentemente` };
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Buscar la reserva con sus pasajeros y el vuelo asociado
+      const reserva = await queryRunner.manager.findOne(CompraReserva, {
+        where: { id_compra: id },
+        relations: { 
+          pasajeros: true,
+          vuelo: true // Necesitamos los datos del vuelo para validar el tiempo
+        },
+      });
+
+      if (!reserva) {
+        throw new NotFoundException(`La reserva con ID ${id} no existe.`);
+      }
+
+      // 2. Validar que ningún pasajero haya realizado el check-in
+      const pasajerosConCheckin = reserva.pasajeros?.filter(p => p.checkin_realizado);
+      if (pasajerosConCheckin && pasajerosConCheckin.length > 0) {
+        throw new BadRequestException(
+          'No se puede cancelar la reserva porque uno o más pasajeros ya realizaron el check-in.'
+        );
+      }
+
+      // 3. Validar el límite de tiempo (mínimo 1 hora antes del vuelo)
+      if (reserva.vuelo) {
+        // Concatenar fecha y hora del vuelo para crear un objeto Date
+        const fechaHoraVuelo = new Date(`${reserva.vuelo.fecha_vuelo}T${reserva.vuelo.hora_vuelo}:00`);
+        const ahora = new Date();
+        
+        // Calcular la diferencia en milisegundos
+        const diferenciaMs = fechaHoraVuelo.getTime() - ahora.getTime();
+        const horasFaltantes = diferenciaMs / (1000 * 60 * 60);
+
+        if (horasFaltantes < 1 && reserva.estado === 'Pagado') {
+          throw new BadRequestException(
+            'Las compras solo pueden ser canceladas con al menos 1 hora de anticipación al vuelo.'
+          );
+        }
+      }
+
+      // 4. Liberar las sillas ocupadas por los pasajeros
+      const idsSillas = reserva.pasajeros
+        ?.map(p => p.id_silla)
+        .filter(id => Boolean(id));
+
+      if (idsSillas && idsSillas.length > 0) {
+        await queryRunner.manager.update(
+          Silla,
+          { id_silla: In(idsSillas) },
+          { estado: 'Disponible' } // Dejamos las sillas libres para otros usuarios
+        );
+      }
+
+      // 5. Procesar el reembolso SOLO si el estado es 'Pagado'
+      if (reserva.estado === 'Pagado') {
+        const billetera = await queryRunner.manager.findOne(Billetera, {
+          where: { id_usuario: reserva.id_usuario },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (billetera) {
+          // Devolver el dinero
+          billetera.saldo += reserva.monto_total;
+          await queryRunner.manager.save(billetera);
+
+          // Registrar el reembolso en el historial
+          const historial = queryRunner.manager.create(Historial, {
+            info_historial: `Reembolso por cancelación de reserva ${reserva.codigo_reserva}. Saldo actual: ${billetera.saldo}`,
+            fecha_transaccion: new Date(),
+            id_billetera: billetera.id_billetera,
+            monto: reserva.monto_total,
+          });
+          await queryRunner.manager.save(historial);
+        }
+      }
+
+      // 6. Eliminar los pasajeros asociados a la reserva
+      if (reserva.pasajeros && reserva.pasajeros.length > 0) {
+        await queryRunner.manager.remove(reserva.pasajeros);
+      }
+
+      // 7. Eliminar físicamente la reserva
+      await queryRunner.manager.remove(reserva);
+
+      await queryRunner.commitTransaction();
+
+      return { 
+        message: reserva.estado === 'Pendiente'
+          ? `Reserva con ID ${id} cancelada exitosamente. Las sillas han sido liberadas.`
+          : `Compra con ID ${id} cancelada exitosamente. Se ha procesado el reembolso y liberado las sillas.`
+      };
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async actualizarSillaReserva(idReserva: number, idPasajero: number, idNuevaSilla: number) {
